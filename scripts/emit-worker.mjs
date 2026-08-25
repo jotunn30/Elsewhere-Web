@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const distRoot = join(projectRoot, 'dist');
 const assetsRoot = join(distRoot, 'assets');
+const detoursRoot = join(distRoot, 'detours');
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.png': 'image/png',
+  '.webp': 'image/webp',
 };
 
 const routes = [];
@@ -31,6 +33,10 @@ await addRoute('/og.png', join(distRoot, 'og.png'));
 
 for (const file of await readdir(assetsRoot)) {
   await addRoute(`/assets/${file}`, join(assetsRoot, file));
+}
+
+for (const file of await readdir(detoursRoot)) {
+  await addRoute(`/detours/${file}`, join(detoursRoot, file));
 }
 
 const workerSource = `const encodedAssets = new Map(${JSON.stringify(routes)});
