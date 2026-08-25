@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3efdf" />
+    <meta name="description" content="A small machine for leaving the ordinary. Generate a playful micro-adventure and go somewhere unexpected." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Elsewhere — Go somewhere unexpected" />
+    <meta property="og:description" content="A small machine for leaving the ordinary." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Elsewhere — Go somewhere unexpected" />
+    <meta name="twitter:description" content="A small machine for leaving the ordinary." />
+    <title>Elsewhere — Your oddly specific escape plan</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="site-shell" id="site-shell">
+      <header class="masthead">
+        <a class="wordmark" href="#top" aria-label="Elsewhere home">ELSEWHERE<span aria-hidden="true">®</span></a>
+        <p class="masthead-note">A small machine for leaving the ordinary</p>
+        <div class="edition" aria-label="Issue 001">
+          <span>ISSUE</span><strong id="issue">001</strong>
+        </div>
+      </header>
+
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="kicker">Your oddly specific escape plan</p>
+          <h1>GO SOMEWHERE<br /><em>UNEXPECTED.</em></h1>
+          <p class="intro">Boredom is a compass. Press the button and we’ll point it somewhere strange.</p>
+          <button class="generate-button" id="generate" type="button">
+            <span>GIVE ME A DETOUR</span>
+            <span class="button-arrow" aria-hidden="true">↗</span>
+          </button>
+          <p class="fine-print">No account. No algorithm. Just a nudge out the door.</p>
+        </div>
+
+        <article class="detour-card" aria-live="polite" aria-atomic="true">
+          <div class="art-shape art-shape--circle" id="art-shape" aria-hidden="true"><span></span></div>
+          <div class="card-topline">
+            <span id="eyebrow">Detour no. 01</span><span>VALID TODAY ONLY</span>
+          </div>
+          <div class="card-body">
+            <p class="card-label">TODAY, YOU WILL</p>
+            <h2 id="detour-title">Follow the color yellow</h2>
+            <p class="instructions" id="instructions">Leave with no destination. Take the first yellow thing you see as a sign, then the next. Stop after seven signs.</p>
+          </div>
+          <dl class="trip-details">
+            <div><dt>TIME</dt><dd id="time">34 minutes</dd></div>
+            <div><dt>TAKE</dt><dd id="take">One small coin</dd></div>
+            <div><dt>ONE RULE</dt><dd id="rule">No maps allowed</dd></div>
+            <div><dt>REWARD</dt><dd id="reward">A new shortcut home</dd></div>
+          </dl>
+          <div class="card-stamp" aria-hidden="true">GO<br />NOW</div>
+        </article>
+      </section>
+
+      <footer class="footer-strip">
+        <p><span aria-hidden="true">●</span> Made for curious people with an hour to lose</p>
+        <p class="footer-quote">“The detour is the destination.”</p>
+        <p>EST. SOMEWHERE, 2026</p>
+      </footer>
+    </main>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
