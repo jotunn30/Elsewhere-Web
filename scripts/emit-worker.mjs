@@ -10,8 +10,10 @@ const detoursRoot = join(distRoot, 'detours');
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
   '.js': 'text/javascript; charset=utf-8',
   '.png': 'image/png',
+  '.svg': 'image/svg+xml; charset=utf-8',
   '.webp': 'image/webp',
 };
 
@@ -30,6 +32,10 @@ async function addRoute(route, filePath) {
 
 await addRoute('/index.html', join(distRoot, 'index.html'));
 await addRoute('/og.png', join(distRoot, 'og.png'));
+
+for (const file of ['favicon.ico', 'favicon.svg', 'favicon-32.png', 'favicon-512.png']) {
+  await addRoute(`/${file}`, join(distRoot, file));
+}
 
 for (const file of await readdir(assetsRoot)) {
   await addRoute(`/assets/${file}`, join(assetsRoot, file));
