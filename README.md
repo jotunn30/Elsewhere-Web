@@ -1,2 +1,3 @@
-This is my first project website. Please, touch it appropriately.
-'Elsewhere' is my first website to launch and publish to public. It is one page website and made for everyone who wants to enlighten their daily life with escape plans to cure boredom, and to set free of stress. It doesn't require any account and all you have to do is to hit the button which gives you random detours each telling you to do something in steps.
+This is my first project website. Please, DO NOT TOUCH IT.
+Elsewhere is a playful digital detour generator for people who want to break out of routine and experience the ordinary differently.
+Instead of recommending famous attractions or planning an efficient itinerary, Elsewhere gives you oddly specific micro-adventures: follow one color through the city, find the quietest table, ask someone for a song, or let a coin decide your route. Each detour includes a time limit, something to bring, one rule, and a small reward.
