@@ -2,6 +2,7 @@ import { supabase } from './supabase.js';
 
 const book = document.querySelector('#passport-book');
 const cover = document.querySelector('#passport-cover');
+const backCover = document.querySelector('#passport-back-cover');
 const spread = document.querySelector('#passport-spread');
 const previousButton = document.querySelector('#passport-previous');
 const nextButton = document.querySelector('#passport-next');
@@ -29,7 +30,8 @@ const signedOutProfile = {
 let profile = signedOutProfile;
 let passportStamps = [];
 let currentUser = null;
-const totalSpreads = 3;
+const totalSpreads = 4;
+const backCoverPosition = totalSpreads + 1;
 let currentPosition = 0;
 let isTurning = false;
 
@@ -108,7 +110,7 @@ function stampSpread(spreadNumber, firstStamp) {
 function spreadPages(position) {
   return position === 1
     ? identitySpread()
-    : stampSpread(position - 1, position === 2 ? 7 : 19);
+    : stampSpread(position - 1, 7 + ((position - 2) * 12));
 }
 
 function renderSpread(position) {
@@ -117,31 +119,129 @@ function renderSpread(position) {
 }
 
 function updateControls() {
-  const isCover = currentPosition === 0;
-  book.classList.toggle('is-open', !isCover);
-  book.dataset.state = isCover ? 'cover' : 'open';
-  spread.setAttribute('aria-hidden', String(isCover));
-  cover.setAttribute('aria-hidden', String(!isCover));
-  cover.tabIndex = isCover ? 0 : -1;
+  const isFrontCover = currentPosition === 0;
+  const isBackCover = currentPosition === backCoverPosition;
+  book.classList.toggle('is-open', !isFrontCover);
+  book.classList.toggle('is-back-closed', isBackCover);
+  book.dataset.state = isFrontCover ? 'cover' : (isBackCover ? 'back-cover' : 'open');
+  spread.setAttribute('aria-hidden', String(isFrontCover || isBackCover));
+  cover.setAttribute('aria-hidden', String(!isFrontCover));
+  cover.tabIndex = isFrontCover ? 0 : -1;
 
-  previousButton.disabled = isCover;
-  nextButton.disabled = currentPosition === totalSpreads;
-  nextButton.setAttribute('aria-label', isCover ? 'Open passport' : 'Next passport page');
-  previousButton.setAttribute('aria-label', currentPosition === 1 ? 'Close passport' : 'Previous passport page');
+  previousButton.disabled = isFrontCover || isTurning;
+  nextButton.disabled = isBackCover || isTurning;
+  nextButton.setAttribute('aria-label', isFrontCover
+    ? 'Open passport'
+    : (currentPosition === totalSpreads ? 'Close passport to the back cover' : 'Next passport page'));
+  previousButton.setAttribute('aria-label', isBackCover
+    ? 'Reopen passport to the last page'
+    : (currentPosition === 1 ? 'Close passport to the front cover' : 'Previous passport page'));
 
-  status.textContent = isCover
+  status.textContent = isFrontCover
     ? 'Cover — use the right arrow to open'
-    : `Spread ${String(currentPosition).padStart(2, '0')} of ${String(totalSpreads).padStart(2, '0')}`;
+    : (isBackCover
+      ? 'Back cover — use the left arrow to reopen'
+      : `Spread ${String(currentPosition).padStart(2, '0')} of ${String(totalSpreads).padStart(2, '0')}`);
 
   progress.forEach((item, index) => item.classList.toggle('is-current', index === currentPosition));
 }
 
+function backCoverSurface() {
+  return `
+    <div class="passport-back-cover-surface">
+      <span class="back-cover-rule back-cover-rule--outer"></span>
+      <span class="back-cover-rule back-cover-rule--inner"></span>
+    </div>`;
+}
+
+function createBackCoverTurn(direction) {
+  const lastPages = spreadPages(totalSpreads);
+  spread.innerHTML = lastPages.upper + lastPages.lower;
+
+  const turningSheet = document.createElement('div');
+  turningSheet.className = `passport-turn-sheet passport-turn-sheet--${direction} passport-turn-sheet--back-cover`;
+  turningSheet.setAttribute('aria-hidden', 'true');
+  turningSheet.innerHTML = `
+    <div class="passport-turn-face passport-turn-face--front">${lastPages.lower}</div>
+    <div class="passport-turn-face passport-turn-face--back">${backCoverSurface()}</div>`;
+  spread.append(turningSheet);
+  return turningSheet;
+}
+
+function closeToBackCover() {
+  isTurning = true;
+  book.classList.add('is-turning');
+  updateControls();
+  status.textContent = 'Closing the back cover…';
+
+  const turningSheet = createBackCoverTurn('forward');
+  let sheetFinished = false;
+  const finishSheet = () => {
+    if (sheetFinished) return;
+    sheetFinished = true;
+    turningSheet.remove();
+    book.classList.add('is-back-cover-visible');
+    void backCover.offsetWidth;
+    currentPosition = backCoverPosition;
+    updateControls();
+    status.textContent = 'Rotating passport closed…';
+
+    window.setTimeout(() => {
+      book.classList.remove('is-turning');
+      isTurning = false;
+      updateControls();
+    }, reduceMotion ? 580 : 820);
+  };
+
+  turningSheet.addEventListener('animationend', finishSheet, { once: true });
+  window.setTimeout(finishSheet, reduceMotion ? 780 : 1100);
+}
+
+function reopenFromBackCover() {
+  isTurning = true;
+  book.classList.add('is-turning');
+  previousButton.disabled = true;
+  nextButton.disabled = true;
+  status.textContent = 'Rotating passport open…';
+  book.classList.remove('is-back-closed');
+
+  window.setTimeout(() => {
+    status.textContent = 'Opening the back cover…';
+    const turningSheet = createBackCoverTurn('backward');
+    book.classList.remove('is-back-cover-visible');
+
+    let turnFinished = false;
+    const finishTurn = () => {
+      if (turnFinished) return;
+      turnFinished = true;
+      currentPosition = totalSpreads;
+      renderSpread(currentPosition);
+      book.classList.remove('is-turning');
+      isTurning = false;
+      updateControls();
+    };
+
+    turningSheet.addEventListener('animationend', finishTurn, { once: true });
+    window.setTimeout(finishTurn, reduceMotion ? 780 : 1100);
+  }, reduceMotion ? 580 : 820);
+}
+
 function goTo(position) {
-  if (isTurning || position < 0 || position > totalSpreads || position === currentPosition) return;
+  if (isTurning || position < 0 || position > backCoverPosition || position === currentPosition) return;
 
   const wasCover = currentPosition === 0;
   const willBeCover = position === 0;
   const direction = position > currentPosition ? 'forward' : 'backward';
+
+  if (currentPosition === totalSpreads && position === backCoverPosition) {
+    closeToBackCover();
+    return;
+  }
+
+  if (currentPosition === backCoverPosition && position === totalSpreads) {
+    reopenFromBackCover();
+    return;
+  }
 
   if (wasCover || willBeCover) {
     currentPosition = position;
@@ -211,7 +311,7 @@ function setFeedback(message = '', isError = false) {
 }
 
 function refreshVisibleSpread() {
-  if (currentPosition > 0 && !isTurning) renderSpread(currentPosition);
+  if (currentPosition > 0 && currentPosition <= totalSpreads && !isTurning) renderSpread(currentPosition);
 }
 
 function showSignedOut() {
