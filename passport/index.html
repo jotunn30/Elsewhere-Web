@@ -54,8 +54,44 @@
             <p class="passport-kicker">Personal field record / Series 001</p>
             <h1 id="passport-heading">YOUR ELSEWHERE <em>PASSPORT.</em></h1>
           </div>
-          <p class="passport-deck">Open it, take the long way, and collect proof that you left the ordinary. Identity details appear after a secure sign-in is connected.</p>
+          <p class="passport-deck">Open it, take the long way, and collect proof that you left the ordinary. Sign in to keep your identity and earned stamps with you.</p>
         </header>
+
+        <section class="passport-account" aria-labelledby="account-title">
+          <div class="account-copy">
+            <p class="account-kicker">Passport control</p>
+            <h2 id="account-title">Your field record</h2>
+            <p id="account-description">Use a private email link to open your passport on any device.</p>
+          </div>
+
+          <form class="account-form account-form--signin" id="passport-signin-form">
+            <label for="passport-email">Email address</label>
+            <div class="account-input-row">
+              <input id="passport-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+              <button type="submit">Email my sign-in link <span aria-hidden="true">↗</span></button>
+            </div>
+          </form>
+
+          <div class="account-member" id="passport-member" hidden>
+            <div class="account-member-topline">
+              <p>Signed in as <strong id="passport-member-email"></strong></p>
+              <button class="account-text-button" id="passport-signout" type="button">Sign out</button>
+            </div>
+            <form class="account-form account-form--profile" id="passport-profile-form">
+              <label>
+                <span>Name</span>
+                <input id="profile-name" name="displayName" type="text" maxlength="80" autocomplete="name" required />
+              </label>
+              <label>
+                <span>Home base</span>
+                <input id="profile-home-base" name="homeBase" type="text" maxlength="80" autocomplete="address-level2" placeholder="City or place" />
+              </label>
+              <button type="submit">Save details</button>
+            </form>
+          </div>
+
+          <p class="account-feedback" id="passport-auth-feedback" role="status" aria-live="polite"></p>
+        </section>
 
         <div class="passport-experience">
           <p class="passport-status" id="passport-status" aria-live="polite">Cover — use the right arrow to open</p>
@@ -139,7 +175,7 @@
           <div class="passport-progress" aria-hidden="true">
             <span class="is-current"></span><span></span><span></span><span></span>
           </div>
-          <p class="passport-privacy">Preview only — this page does not store personal information or award stamps yet.</p>
+          <p class="passport-privacy" id="passport-sync-note">Sign in to sync your identity. Stamps appear only after verified completions.</p>
         </div>
       </section>
 

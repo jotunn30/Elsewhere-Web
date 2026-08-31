@@ -52,6 +52,124 @@
   line-height: 1.42;
 }
 
+.passport-account {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.65fr) minmax(360px, 1.35fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 64px);
+  margin-bottom: clamp(28px, 4vw, 46px);
+  padding: clamp(18px, 2vw, 26px);
+  border: 2px solid var(--ink);
+  background: color-mix(in srgb, var(--paper) 82%, white);
+  box-shadow: 7px 8px 0 var(--passport-ink);
+}
+
+.account-copy h2 {
+  margin: 3px 0 6px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.55rem, 2.4vw, 2.4rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+.account-copy p { margin: 0; }
+
+.account-copy #account-description {
+  max-width: 360px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.account-kicker,
+.account-form label,
+.account-member-topline,
+.account-feedback {
+  font-size: 0.57rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.account-kicker { color: var(--passport-ink); }
+
+.account-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.account-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.account-form input {
+  width: 100%;
+  min-width: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: #fffdf4;
+  color: var(--ink);
+  padding: 12px 13px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1rem;
+}
+
+.account-form input:focus-visible { outline: 3px solid var(--acid); outline-offset: 1px; }
+
+.account-form button,
+.account-text-button {
+  border: 2px solid var(--ink);
+  background: var(--acid);
+  color: var(--ink);
+  padding: 11px 15px;
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.account-form button:disabled { cursor: wait; opacity: 0.58; }
+
+.account-member-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 13px;
+}
+
+.account-member-topline p { margin: 0; overflow-wrap: anywhere; }
+
+.account-text-button {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 1.5px solid currentColor;
+  background: transparent;
+  padding: 3px 0;
+}
+
+.account-form--profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.account-feedback {
+  grid-column: 1 / -1;
+  min-height: 1em;
+  margin: -8px 0 0;
+  color: var(--passport-ink);
+  line-height: 1.4;
+}
+
+.account-feedback.is-error { color: #b73522; }
+
+[hidden] { display: none !important; }
+
 .passport-experience {
   padding-top: 18px;
   border-top: 2px solid var(--ink);
@@ -356,6 +474,38 @@
   letter-spacing: 0.1em;
 }
 
+.stamp-space.is-earned {
+  border: 2px solid var(--passport-ink);
+  background: color-mix(in srgb, var(--acid) 30%, transparent);
+  color: var(--passport-ink);
+}
+
+.stamp-space.is-earned::before {
+  content: '↗';
+  display: grid;
+  width: clamp(34px, 5vw, 52px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(1rem, 2.3vw, 2rem);
+  font-weight: 900;
+  opacity: 0.9;
+}
+
+.stamp-space.is-earned span {
+  right: auto;
+  bottom: 7%;
+  left: 50%;
+  width: 82%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 .passport-cover {
   position: absolute;
   z-index: 5;
@@ -519,6 +669,8 @@
 @media (max-width: 1000px) {
   .passport-intro { grid-template-columns: 1fr; align-items: start; }
   .passport-deck { max-width: 620px; }
+  .passport-account { grid-template-columns: 1fr; }
+  .account-copy #account-description { max-width: 620px; }
   .passport-stage-row { grid-template-columns: 52px minmax(0, 760px) 52px; gap: 14px; }
   .passport-arrow { width: 52px; height: 52px; }
 }
@@ -526,6 +678,10 @@
 @media (max-width: 760px) {
   .passport-main { padding: 24px 14px 58px; }
   .passport-intro h1 { font-size: clamp(3rem, 16vw, 5.6rem); }
+  .passport-account { padding: 17px; box-shadow: 5px 6px 0 var(--passport-ink); }
+  .account-input-row,
+  .account-form--profile { grid-template-columns: 1fr; }
+  .account-form button { width: 100%; }
   .passport-stage-row {
     grid-template-columns: 1fr 1fr;
     gap: 14px 22px;

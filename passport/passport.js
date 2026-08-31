@@ -1,3 +1,5 @@
+import { supabase } from './supabase.js';
+
 const book = document.querySelector('#passport-book');
 const cover = document.querySelector('#passport-cover');
 const spread = document.querySelector('#passport-spread');
@@ -6,6 +8,16 @@ const nextButton = document.querySelector('#passport-next');
 const status = document.querySelector('#passport-status');
 const progress = [...document.querySelectorAll('.passport-progress span')];
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const signInForm = document.querySelector('#passport-signin-form');
+const memberPanel = document.querySelector('#passport-member');
+const memberEmail = document.querySelector('#passport-member-email');
+const signOutButton = document.querySelector('#passport-signout');
+const profileForm = document.querySelector('#passport-profile-form');
+const profileNameInput = document.querySelector('#profile-name');
+const profileHomeBaseInput = document.querySelector('#profile-home-base');
+const authFeedback = document.querySelector('#passport-auth-feedback');
+const accountDescription = document.querySelector('#account-description');
+const syncNote = document.querySelector('#passport-sync-note');
 
 const signedOutProfile = {
   name: 'SIGN IN TO COMPLETE',
@@ -14,14 +26,37 @@ const signedOutProfile = {
   passportNumber: 'PENDING',
 };
 
-const profile = window.elsewherePassportUser ?? signedOutProfile;
+let profile = signedOutProfile;
+let passportStamps = [];
+let currentUser = null;
 const totalSpreads = 3;
 let currentPosition = 0;
 let isTurning = false;
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function stampSpaces(start, count = 6) {
   return Array.from({ length: count }, (_, index) => {
     const number = String(start + index).padStart(2, '0');
+    const earnedStamp = passportStamps[start + index - 1];
+
+    if (earnedStamp) {
+      const detourName = earnedStamp.detour_id.replaceAll('-', ' ').toUpperCase();
+      const awardedDate = new Intl.DateTimeFormat('en', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }).format(new Date(earnedStamp.awarded_at));
+      return `<div class="stamp-space is-earned" aria-label="${escapeHtml(detourName)}, earned ${escapeHtml(awardedDate)}"><span>${escapeHtml(detourName)}</span></div>`;
+    }
+
     return `<div class="stamp-space"><span>STAMP ${number}</span></div>`;
   }).join('');
 }
@@ -41,10 +76,10 @@ function identitySpread() {
           <small>PHOTO</small>
         </div>
         <dl class="identity-fields">
-          <div class="identity-field identity-field--wide"><dt>Name</dt><dd>${profile.name}</dd></div>
-          <div class="identity-field"><dt>Home base</dt><dd>${profile.homeBase}</dd></div>
-          <div class="identity-field"><dt>Member since</dt><dd>${profile.memberSince}</dd></div>
-          <div class="identity-field identity-field--wide"><dt>Passport no.</dt><dd>${profile.passportNumber}</dd></div>
+          <div class="identity-field identity-field--wide"><dt>Name</dt><dd>${escapeHtml(profile.name)}</dd></div>
+          <div class="identity-field"><dt>Home base</dt><dd>${escapeHtml(profile.homeBase)}</dd></div>
+          <div class="identity-field"><dt>Member since</dt><dd>${escapeHtml(profile.memberSince)}</dd></div>
+          <div class="identity-field identity-field--wide"><dt>Passport no.</dt><dd>${escapeHtml(profile.passportNumber)}</dd></div>
         </dl>
       </div>
       <div class="identity-machine-line" aria-hidden="true">P&lt;ELSEWHERE&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
@@ -124,6 +159,151 @@ function goTo(position) {
   }, 470);
 }
 
+function formatMemberSince(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' })
+    .format(new Date(value))
+    .toUpperCase();
+}
+
+function setFeedback(message = '', isError = false) {
+  authFeedback.textContent = message;
+  authFeedback.classList.toggle('is-error', isError);
+}
+
+function refreshVisibleSpread() {
+  if (currentPosition > 0) renderSpread(currentPosition);
+}
+
+function showSignedOut() {
+  currentUser = null;
+  profile = signedOutProfile;
+  passportStamps = [];
+  signInForm.hidden = false;
+  memberPanel.hidden = true;
+  accountDescription.textContent = 'Use a private email link to open your passport on any device.';
+  syncNote.textContent = 'Sign in to sync your identity. Stamps appear only after verified completions.';
+  refreshVisibleSpread();
+}
+
+async function loadPassportData(user) {
+  const [profileResult, stampsResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('display_name, home_base, passport_number, created_at')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('stamps')
+      .select('detour_id, awarded_at')
+      .eq('user_id', user.id)
+      .order('awarded_at', { ascending: true }),
+  ]);
+
+  if (profileResult.error) {
+    profile = {
+      name: user.email?.split('@')[0]?.toUpperCase() || 'TRAVELER',
+      homeBase: '—',
+      memberSince: '—',
+      passportNumber: 'SETUP REQUIRED',
+    };
+    passportStamps = [];
+    setFeedback('Connected. Run the Elsewhere setup SQL in Supabase to activate profiles and stamps.', true);
+    syncNote.textContent = 'Account connected — passport database setup is still required.';
+    refreshVisibleSpread();
+    return;
+  }
+
+  const profileRow = profileResult.data;
+  profile = {
+    name: profileRow.display_name?.trim()?.toUpperCase() || 'TRAVELER',
+    homeBase: profileRow.home_base?.trim()?.toUpperCase() || 'NOT SET',
+    memberSince: formatMemberSince(profileRow.created_at),
+    passportNumber: profileRow.passport_number,
+  };
+  passportStamps = stampsResult.error ? [] : (stampsResult.data ?? []);
+  profileNameInput.value = profileRow.display_name ?? '';
+  profileHomeBaseInput.value = profileRow.home_base ?? '';
+  setFeedback(stampsResult.error ? 'Profile loaded, but stamps could not be retrieved.' : 'Passport synced.', Boolean(stampsResult.error));
+  syncNote.textContent = stampsResult.error
+    ? 'Identity synced — stamp records are temporarily unavailable.'
+    : `Signed in — ${passportStamps.length} earned ${passportStamps.length === 1 ? 'stamp' : 'stamps'} synced securely.`;
+  refreshVisibleSpread();
+}
+
+async function syncAccount(session) {
+  const user = session?.user;
+  if (!user) {
+    showSignedOut();
+    return;
+  }
+
+  currentUser = user;
+  signInForm.hidden = true;
+  memberPanel.hidden = false;
+  memberEmail.textContent = user.email ?? 'Elsewhere traveler';
+  accountDescription.textContent = 'Your identity and earned stamps travel with this account.';
+  setFeedback('Loading your passport…');
+  await loadPassportData(user);
+}
+
+signInForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = signInForm.querySelector('button[type="submit"]');
+  const email = new FormData(signInForm).get('email')?.toString().trim();
+  if (!email) return;
+
+  submitButton.disabled = true;
+  setFeedback('Sending your private sign-in link…');
+  const redirectUrl = new URL('.', window.location.href);
+  redirectUrl.search = '';
+  redirectUrl.hash = '';
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirectUrl.href },
+  });
+
+  submitButton.disabled = false;
+  setFeedback(
+    error ? error.message : 'Link sent. Check your email, then return here to open your passport.',
+    Boolean(error),
+  );
+});
+
+signOutButton.addEventListener('click', async () => {
+  signOutButton.disabled = true;
+  const { error } = await supabase.auth.signOut();
+  signOutButton.disabled = false;
+  if (error) setFeedback(error.message, true);
+});
+
+profileForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!currentUser) return;
+  const submitButton = profileForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  setFeedback('Saving your passport details…');
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      display_name: profileNameInput.value.trim(),
+      home_base: profileHomeBaseInput.value.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', currentUser.id);
+
+  submitButton.disabled = false;
+  if (error) {
+    setFeedback(error.message, true);
+    return;
+  }
+
+  await loadPassportData(currentUser);
+  setFeedback('Details saved. Your passport is up to date.');
+});
+
 cover.addEventListener('click', () => goTo(1));
 previousButton.addEventListener('click', () => goTo(currentPosition - 1));
 nextButton.addEventListener('click', () => goTo(currentPosition + 1));
@@ -135,3 +315,10 @@ window.addEventListener('keydown', (event) => {
 
 renderSpread(1);
 updateControls();
+
+const { data: initialSessionData } = await supabase.auth.getSession();
+await syncAccount(initialSessionData.session);
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  window.setTimeout(() => syncAccount(session), 0);
+});
