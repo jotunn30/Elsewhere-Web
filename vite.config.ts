@@ -4,4 +4,12 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
   plugins: [sites()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        library: 'library/index.html',
+      },
+    },
+  },
 });
