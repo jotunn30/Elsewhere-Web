@@ -785,5 +785,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .passport-turn-sheet { animation: none; }
+  .passport-cover {
+    transition: transform 560ms cubic-bezier(0.42, 0.06, 0.18, 1) !important;
+  }
+
+  .passport-paper-stack,
+  .passport-spread {
+    transition: opacity 140ms ease 80ms, transform 560ms ease !important;
+  }
+
+  .passport-turn-sheet--forward,
+  .passport-turn-sheet--backward {
+    animation-duration: 680ms !important;
+  }
 }

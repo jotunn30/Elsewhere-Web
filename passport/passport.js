@@ -143,22 +143,20 @@ function goTo(position) {
   const willBeCover = position === 0;
   const direction = position > currentPosition ? 'forward' : 'backward';
 
-  if (wasCover || willBeCover || reduceMotion) {
+  if (wasCover || willBeCover) {
     currentPosition = position;
     if (!willBeCover) renderSpread(currentPosition);
     updateControls();
 
-    if (!reduceMotion) {
-      isTurning = true;
-      book.classList.add('is-turning');
-      previousButton.disabled = true;
-      nextButton.disabled = true;
-      window.setTimeout(() => {
-        book.classList.remove('is-turning');
-        isTurning = false;
-        updateControls();
-      }, 920);
-    }
+    isTurning = true;
+    book.classList.add('is-turning');
+    previousButton.disabled = true;
+    nextButton.disabled = true;
+    window.setTimeout(() => {
+      book.classList.remove('is-turning');
+      isTurning = false;
+      updateControls();
+    }, reduceMotion ? 620 : 920);
     return;
   }
 
@@ -197,7 +195,7 @@ function goTo(position) {
   };
 
   turningSheet.addEventListener('animationend', finishTurn, { once: true });
-  window.setTimeout(finishTurn, 1100);
+  window.setTimeout(finishTurn, reduceMotion ? 780 : 1100);
 }
 
 function formatMemberSince(value) {
