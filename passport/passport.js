@@ -156,7 +156,7 @@ function goTo(position) {
       book.classList.remove('is-turning');
       isTurning = false;
       updateControls();
-    }, reduceMotion ? 620 : 920);
+    }, reduceMotion ? 780 : 1280);
     return;
   }
 
