@@ -34,6 +34,7 @@ async function addRoute(route, filePath) {
 
 await addRoute('/index.html', join(distRoot, 'index.html'));
 await addRoute('/library/index.html', join(distRoot, 'library', 'index.html'));
+await addRoute('/passport/index.html', join(distRoot, 'passport', 'index.html'));
 await addRoute('/og.png', join(distRoot, 'og.png'));
 await addRoute('/robots.txt', join(distRoot, 'robots.txt'));
 await addRoute('/sitemap.xml', join(distRoot, 'sitemap.xml'));
@@ -78,6 +79,8 @@ export default {
       ? '/index.html'
       : url.pathname === '/library' || url.pathname === '/library/'
         ? '/library/index.html'
+        : url.pathname === '/passport' || url.pathname === '/passport/'
+          ? '/passport/index.html'
         : url.pathname;
     const asset = encodedAssets.get(path);
 

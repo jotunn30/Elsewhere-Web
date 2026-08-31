@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         library: 'library/index.html',
+        passport: 'passport/index.html',
       },
     },
   },
