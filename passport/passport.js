@@ -44,7 +44,6 @@ function escapeHtml(value) {
 
 function stampSpaces(start, count = 6) {
   return Array.from({ length: count }, (_, index) => {
-    const number = String(start + index).padStart(2, '0');
     const earnedStamp = passportStamps[start + index - 1];
 
     if (earnedStamp) {
@@ -57,7 +56,7 @@ function stampSpaces(start, count = 6) {
       return `<div class="stamp-space is-earned" aria-label="${escapeHtml(detourName)}, earned ${escapeHtml(awardedDate)}"><span>${escapeHtml(detourName)}</span></div>`;
     }
 
-    return `<div class="stamp-space"><span>STAMP ${number}</span></div>`;
+    return '<div class="stamp-space" aria-hidden="true"></div>';
   }).join('');
 }
 
@@ -65,9 +64,18 @@ function register(title, number) {
   return `<div class="page-register"><span>${title}</span><span>${number}</span></div>`;
 }
 
-function identitySpread() {
+function stampPage(position, pageNumber, firstStamp) {
   return `
-    <section class="passport-page passport-page--upper identity-page" aria-label="Identity page">
+    <section class="passport-page passport-page--${position} stamp-page" aria-label="Stamp page ${pageNumber}">
+      ${register(`COMPLETED DETOURS / ${pageNumber}`, pageNumber)}
+      <div class="stamp-grid" aria-label="Stamp page">${stampSpaces(firstStamp)}</div>
+    </section>`;
+}
+
+function identitySpread() {
+  return {
+    upper: `
+      <section class="passport-page passport-page--upper identity-page" aria-label="Identity page">
       ${register('ELSEWHERE / IDENTITY', 'P')}
       <div class="identity-layout">
         <div class="passport-portrait" aria-label="Profile image placeholder">
@@ -83,31 +91,29 @@ function identitySpread() {
         </dl>
       </div>
       <div class="identity-machine-line" aria-hidden="true">P&lt;ELSEWHERE&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
-    </section>
-    <section class="passport-page passport-page--lower stamp-page" aria-label="Stamp page one">
-      ${register('COMPLETED DETOURS / 01', '01')}
-      <div class="stamp-grid" aria-label="Six empty stamp spaces">${stampSpaces(1)}</div>
-    </section>`;
+      </section>`,
+    lower: stampPage('lower', '01', 1),
+  };
 }
 
 function stampSpread(spreadNumber, firstStamp) {
   const upperPage = String(spreadNumber * 2).padStart(2, '0');
   const lowerPage = String(spreadNumber * 2 + 1).padStart(2, '0');
-  return `
-    <section class="passport-page passport-page--upper stamp-page" aria-label="Stamp page ${upperPage}">
-      ${register(`COMPLETED DETOURS / ${upperPage}`, upperPage)}
-      <div class="stamp-grid" aria-label="Six empty stamp spaces">${stampSpaces(firstStamp)}</div>
-    </section>
-    <section class="passport-page passport-page--lower stamp-page" aria-label="Stamp page ${lowerPage}">
-      ${register(`COMPLETED DETOURS / ${lowerPage}`, lowerPage)}
-      <div class="stamp-grid" aria-label="Six empty stamp spaces">${stampSpaces(firstStamp + 6)}</div>
-    </section>`;
+  return {
+    upper: stampPage('upper', upperPage, firstStamp),
+    lower: stampPage('lower', lowerPage, firstStamp + 6),
+  };
+}
+
+function spreadPages(position) {
+  return position === 1
+    ? identitySpread()
+    : stampSpread(position - 1, position === 2 ? 7 : 19);
 }
 
 function renderSpread(position) {
-  spread.innerHTML = position === 1
-    ? identitySpread()
-    : stampSpread(position - 1, position === 2 ? 7 : 19);
+  const pages = spreadPages(position);
+  spread.innerHTML = pages.upper + pages.lower;
 }
 
 function updateControls() {
@@ -141,22 +147,57 @@ function goTo(position) {
     currentPosition = position;
     if (!willBeCover) renderSpread(currentPosition);
     updateControls();
+
+    if (!reduceMotion) {
+      isTurning = true;
+      book.classList.add('is-turning');
+      previousButton.disabled = true;
+      nextButton.disabled = true;
+      window.setTimeout(() => {
+        book.classList.remove('is-turning');
+        isTurning = false;
+        updateControls();
+      }, 920);
+    }
     return;
   }
 
   isTurning = true;
-  spread.classList.add(`turn-${direction}`);
+  book.classList.add('is-turning');
+  previousButton.disabled = true;
+  nextButton.disabled = true;
+  status.textContent = direction === 'forward' ? 'Turning forward…' : 'Turning back…';
 
-  window.setTimeout(() => {
+  const fromPages = spreadPages(currentPosition);
+  const toPages = spreadPages(position);
+  const underlyingUpper = direction === 'forward' ? fromPages.upper : toPages.upper;
+  const underlyingLower = direction === 'forward' ? toPages.lower : fromPages.lower;
+  const sheetFront = direction === 'forward' ? fromPages.lower : toPages.lower;
+  const sheetBack = direction === 'forward' ? toPages.upper : fromPages.upper;
+
+  spread.innerHTML = underlyingUpper + underlyingLower;
+
+  const turningSheet = document.createElement('div');
+  turningSheet.className = `passport-turn-sheet passport-turn-sheet--${direction}`;
+  turningSheet.setAttribute('aria-hidden', 'true');
+  turningSheet.innerHTML = `
+    <div class="passport-turn-face passport-turn-face--front">${sheetFront}</div>
+    <div class="passport-turn-face passport-turn-face--back">${sheetBack}</div>`;
+  spread.append(turningSheet);
+
+  let turnFinished = false;
+  const finishTurn = () => {
+    if (turnFinished) return;
+    turnFinished = true;
     currentPosition = position;
     renderSpread(currentPosition);
-    updateControls();
-  }, 220);
-
-  window.setTimeout(() => {
-    spread.classList.remove(`turn-${direction}`);
+    book.classList.remove('is-turning');
     isTurning = false;
-  }, 470);
+    updateControls();
+  };
+
+  turningSheet.addEventListener('animationend', finishTurn, { once: true });
+  window.setTimeout(finishTurn, 1100);
 }
 
 function formatMemberSince(value) {
@@ -172,7 +213,7 @@ function setFeedback(message = '', isError = false) {
 }
 
 function refreshVisibleSpread() {
-  if (currentPosition > 0) renderSpread(currentPosition);
+  if (currentPosition > 0 && !isTurning) renderSpread(currentPosition);
 }
 
 function showSignedOut() {
