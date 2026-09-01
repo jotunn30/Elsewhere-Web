@@ -48,17 +48,21 @@
           <img class="open-folder__image" id="folder-image" src="/images/library/free.webp" alt="" />
           <div class="open-folder__wash" aria-hidden="true"></div>
           <header class="open-folder__header">
-            <div class="category-topline"><span id="folder-label">Category 01</span><span>0 detours</span></div>
-            <h1 id="folder-title">FREE</h1>
-            <p id="folder-description">For an escape that costs nothing but attention.</p>
+            <div class="category-topline"><span id="folder-label">Category 01</span><span id="folder-count">0 detours</span></div>
+            <div class="folder-lead" id="folder-lead">
+              <h1 id="folder-title">FREE</h1>
+              <p id="folder-description">For an escape that costs nothing but attention.</p>
+            </div>
           </header>
 
-          <div class="folder-empty" role="status">
-            <span class="folder-empty__mark" aria-hidden="true">↗</span>
+          <div class="detour-gallery" id="detour-gallery" aria-label="Free detours in sequence" hidden></div>
+
+          <div class="folder-empty" id="folder-summary" role="status">
+            <span class="folder-empty__mark" id="folder-summary-mark" aria-hidden="true">↗</span>
             <div>
-              <p class="folder-empty__kicker">Nothing filed yet</p>
-              <h2>This folder is empty.</h2>
-              <p>We’ll place the first detours here when this collection is ready.</p>
+              <p class="folder-empty__kicker" id="folder-summary-kicker">Nothing filed yet</p>
+              <h2 id="folder-summary-title">This folder is empty.</h2>
+              <p id="folder-summary-description">We’ll place the first detours here when this collection is ready.</p>
             </div>
           </div>
         </section>
@@ -70,6 +74,13 @@
         <p>EST. BY JOTUNN, 2026</p>
       </footer>
     </main>
+
+    <dialog class="detour-reader" id="detour-reader" aria-label="Expanded detour">
+      <button class="detour-reader__close" id="detour-reader-close" type="button" aria-label="Close expanded detour">
+        <span aria-hidden="true">×</span>
+      </button>
+      <div class="detour-reader__stage" id="detour-reader-stage"></div>
+    </dialog>
     <script type="module" src="/library/category/category.js"></script>
   </body>
 </html>
