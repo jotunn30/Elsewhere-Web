@@ -322,6 +322,22 @@ elements.reader.addEventListener('click', (event) => {
 const closeLinks = document.querySelectorAll('.folder-back, .site-nav a[href="/library/"]');
 let isClosing = false;
 
+function resetCategoryPageState() {
+  isClosing = false;
+  isReaderAnimating = false;
+  document.body.classList.remove('folder-transition-active', 'detour-reader-open');
+  elements.openFolder.classList.remove('open-folder--source-hidden');
+  document.querySelectorAll('.folder-transition-backdrop, .open-folder--route-clone').forEach((element) => {
+    element.getAnimations().forEach((animation) => animation.cancel());
+    element.remove();
+  });
+
+  if (elements.reader.open) elements.reader.close();
+  elements.reader.getAnimations().forEach((animation) => animation.cancel());
+  elements.readerStage.innerHTML = '';
+  activeThumbnail = null;
+}
+
 function isPlainNavigation(event) {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
@@ -388,3 +404,5 @@ function closeFolder(event) {
 }
 
 closeLinks.forEach((link) => link.addEventListener('click', closeFolder));
+window.addEventListener('pagehide', resetCategoryPageState);
+window.addEventListener('pageshow', resetCategoryPageState);

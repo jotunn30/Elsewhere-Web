@@ -13,6 +13,16 @@ function makeBackdrop() {
   return backdrop;
 }
 
+function resetFolderTransition() {
+  isNavigating = false;
+  document.body.classList.remove('folder-transition-active');
+  folders.forEach((folder) => folder.classList.remove('category-card--source-hidden'));
+  document.querySelectorAll('.folder-transition-backdrop, .category-card--route-clone').forEach((element) => {
+    element.getAnimations().forEach((animation) => animation.cancel());
+    element.remove();
+  });
+}
+
 function openFolder(event) {
   if (!isPlainNavigation(event) || isNavigating) return;
 
@@ -81,3 +91,5 @@ function openFolder(event) {
 }
 
 folders.forEach((folder) => folder.addEventListener('click', openFolder));
+window.addEventListener('pagehide', resetFolderTransition);
+window.addEventListener('pageshow', resetFolderTransition);
