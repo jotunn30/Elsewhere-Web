@@ -316,7 +316,7 @@ elements.reader.addEventListener('cancel', (event) => {
   closeReader();
 });
 elements.reader.addEventListener('click', (event) => {
-  if (event.target === elements.reader) closeReader();
+  if (!event.target.closest('.library-reader-card')) closeReader();
 });
 
 const closeLinks = document.querySelectorAll('.folder-back, .site-nav a[href="/library/"]');
