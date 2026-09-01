@@ -297,7 +297,7 @@ async function closeReader() {
 
   await Promise.allSettled([cardMotion.finished, readerFade.finished]);
   elements.reader.close();
-  elements.reader.getAnimations().forEach((animation) => animation.cancel());
+  elements.reader.getAnimations?.().forEach((animation) => animation.cancel());
   document.body.classList.remove('detour-reader-open');
   elements.readerStage.innerHTML = '';
   activeThumbnail?.focus({ preventScroll: true });
@@ -333,7 +333,7 @@ function resetCategoryPageState() {
   });
 
   if (elements.reader.open) elements.reader.close();
-  elements.reader.getAnimations().forEach((animation) => animation.cancel());
+  elements.reader.getAnimations?.().forEach((animation) => animation.cancel());
   elements.readerStage.innerHTML = '';
   activeThumbnail = null;
 }

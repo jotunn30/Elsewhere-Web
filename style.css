@@ -143,8 +143,8 @@ h1 em { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
 .gallery-card-stamp { position: absolute; z-index: 4; top: 42%; right: 14px; display: grid; width: 48px; height: 48px; place-items: center; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--acid); box-shadow: 3px 3px 0 var(--ink); text-align: center; font-size: 0.43rem; font-weight: 900; line-height: 0.9; letter-spacing: 0.06em; text-transform: uppercase; transform: rotate(8deg); }
 
 .detour-reader-open { overflow: hidden; }
-.detour-reader { position: fixed; z-index: 2000; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: clamp(18px, 4vw, 42px); overflow: auto; border: 0; background: rgba(25, 24, 22, 0.94); color: var(--ink); opacity: 0; backdrop-filter: blur(4px); }
-.detour-reader[open] { display: grid; place-items: center; }
+.detour-reader { position: fixed; z-index: 2000; inset: 0; display: none; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: clamp(18px, 4vw, 42px); overflow: auto; border: 0; background: rgba(25, 24, 22, 0.94); color: var(--ink); opacity: 0; pointer-events: none; backdrop-filter: blur(4px); }
+.detour-reader[open] { display: grid; place-items: center; opacity: 1; pointer-events: auto; }
 .detour-reader::backdrop { background: transparent; }
 .detour-reader__stage { width: min(860px, calc(100vw - 28px)); padding: 12px 16px 22px; }
 .library-reader-card { width: 100%; min-height: 620px; transform: rotate(1.25deg); transform-origin: center; }
