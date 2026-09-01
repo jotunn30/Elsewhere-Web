@@ -70,3 +70,74 @@ document.querySelector('#folder-title').textContent = category.title;
 document.querySelector('#folder-description').textContent = category.description;
 document.querySelector('#folder-image').src = category.image;
 document.title = `${category.title} Detours — Elsewhere`;
+
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const closeLinks = document.querySelectorAll('.folder-back, .site-nav a[href="/library/"]');
+let isClosing = false;
+
+function isPlainNavigation(event) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
+function closeFolder(event) {
+  if (!isPlainNavigation(event) || isClosing) return;
+
+  const destination = event.currentTarget.href;
+  const folder = document.querySelector('#open-folder');
+
+  if (prefersReducedMotion.matches || typeof folder.animate !== 'function') return;
+
+  event.preventDefault();
+  isClosing = true;
+
+  const start = folder.getBoundingClientRect();
+  const targetWidth = Math.min(window.innerWidth - 40, 250);
+  const targetHeight = Math.min(window.innerHeight - 40, 220);
+  const targetLeft = (window.innerWidth - targetWidth) / 2;
+  const targetTop = (window.innerHeight - targetHeight) / 2;
+  const translateX = targetLeft - start.left;
+  const translateY = targetTop - start.top;
+  const scaleX = targetWidth / start.width;
+  const scaleY = targetHeight / start.height;
+  const clone = folder.cloneNode(true);
+  const backdrop = document.createElement('div');
+
+  backdrop.className = 'folder-transition-backdrop';
+  backdrop.setAttribute('aria-hidden', 'true');
+  clone.removeAttribute('id');
+  clone.setAttribute('aria-hidden', 'true');
+  clone.classList.add('open-folder--route-clone');
+  Object.assign(clone.style, {
+    left: `${start.left}px`,
+    top: `${start.top}px`,
+    width: `${start.width}px`,
+    height: `${start.height}px`,
+  });
+
+  folder.classList.add('open-folder--source-hidden');
+  document.body.classList.add('folder-transition-active');
+  document.body.append(backdrop, clone);
+
+  backdrop.animate(
+    [{ opacity: 0 }, { opacity: 1 }],
+    { duration: 460, easing: 'ease-out', fill: 'forwards' },
+  );
+
+  const motion = clone.animate(
+    [
+      {
+        transform: 'rotate(0deg)',
+      },
+      {
+        transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(1deg)`,
+      },
+    ],
+    { duration: 520, easing: 'cubic-bezier(.55,.02,.35,1)', fill: 'forwards' },
+  );
+
+  motion.finished
+    .catch(() => undefined)
+    .finally(() => window.location.assign(destination));
+}
+
+closeLinks.forEach((link) => link.addEventListener('click', closeFolder));
