@@ -230,7 +230,37 @@ if (categoryKey === 'free') {
 }
 
 let activeThumbnail = null;
-let isReaderAnimating = false;
+let isReaderClosing = false;
+let readerAnimations = [];
+
+function cancelReaderAnimations() {
+  readerAnimations.forEach((animation) => {
+    try {
+      animation?.cancel?.();
+    } catch {
+      // The dialog state is still restored below if a browser cannot cancel an animation.
+    }
+  });
+  readerAnimations = [];
+}
+
+function waitForReaderAnimations(animations, fallbackDuration) {
+  if (animations.length === 0) return Promise.resolve();
+
+  const finishedPromises = animations
+    .map((animation) => animation?.finished)
+    .filter((finished) => finished && typeof finished.then === 'function');
+  const animationFinished = finishedPromises.length === animations.length
+    ? Promise.allSettled(finishedPromises)
+    : new Promise((resolve) => window.setTimeout(resolve, fallbackDuration));
+  const fallbackFinished = new Promise((resolve) => window.setTimeout(resolve, fallbackDuration + 100));
+
+  return Promise.race([animationFinished, fallbackFinished]);
+}
+
+function animateReaderElement(element, keyframes, options) {
+  return typeof element?.animate === 'function' ? element.animate(keyframes, options) : null;
+}
 
 function getReaderMotion(sourceRect, destinationRect, reverse = false) {
   const translateX = sourceRect.left + sourceRect.width / 2 - (destinationRect.left + destinationRect.width / 2);
@@ -243,7 +273,7 @@ function getReaderMotion(sourceRect, destinationRect, reverse = false) {
 }
 
 function openReader(thumbnail) {
-  if (elements.reader.open || isReaderAnimating) return;
+  if (elements.reader.open || isReaderClosing) return;
 
   const detour = detours[Number(thumbnail.dataset.detourIndex)];
   const sourceCard = thumbnail.querySelector('.gallery-detour-card');
@@ -254,29 +284,34 @@ function openReader(thumbnail) {
   elements.reader.setAttribute('aria-label', `${detour.eyebrow}: ${detour.title}`);
   elements.reader.showModal();
   document.body.classList.add('detour-reader-open');
-  isReaderAnimating = true;
 
   const readerCard = elements.readerStage.querySelector('.library-reader-card');
   const destinationRect = readerCard.getBoundingClientRect();
-  const cardMotion = readerCard.animate(
-    getReaderMotion(sourceRect, destinationRect),
-    { duration: 560, easing: 'cubic-bezier(.2,.82,.2,1)', fill: 'forwards' },
-  );
-  const readerFade = elements.reader.animate(
-    [{ opacity: 0 }, { opacity: 1 }],
-    { duration: 360, easing: 'ease-out', fill: 'forwards' },
-  );
+  readerAnimations = [
+    animateReaderElement(
+      readerCard,
+      getReaderMotion(sourceRect, destinationRect),
+      { duration: 560, easing: 'cubic-bezier(.2,.82,.2,1)', fill: 'forwards' },
+    ),
+    animateReaderElement(
+      elements.reader,
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 360, easing: 'ease-out', fill: 'forwards' },
+    ),
+  ].filter(Boolean);
 
-  Promise.allSettled([cardMotion.finished, readerFade.finished]).then(() => {
-    isReaderAnimating = false;
+  waitForReaderAnimations(readerAnimations, 560).then(() => {
+    if (!elements.reader.open || isReaderClosing || activeThumbnail !== thumbnail) return;
+    cancelReaderAnimations();
     elements.readerClose.focus({ preventScroll: true });
   });
 }
 
 async function closeReader() {
-  if (!elements.reader.open || isReaderAnimating) return;
+  if (!elements.reader.open || isReaderClosing) return;
 
-  isReaderAnimating = true;
+  isReaderClosing = true;
+  cancelReaderAnimations();
   const readerCard = elements.readerStage.querySelector('.library-reader-card');
   const sourceCard = activeThumbnail?.querySelector('.gallery-detour-card');
   const sourceRect = sourceCard?.getBoundingClientRect() ?? {
@@ -286,23 +321,27 @@ async function closeReader() {
     height: 220,
   };
   const destinationRect = readerCard.getBoundingClientRect();
-  const cardMotion = readerCard.animate(
-    getReaderMotion(sourceRect, destinationRect, true),
-    { duration: 460, easing: 'cubic-bezier(.55,.02,.35,1)', fill: 'forwards' },
-  );
-  const readerFade = elements.reader.animate(
-    [{ opacity: 1 }, { opacity: 0 }],
-    { duration: 400, easing: 'ease-in', fill: 'forwards' },
-  );
+  readerAnimations = [
+    animateReaderElement(
+      readerCard,
+      getReaderMotion(sourceRect, destinationRect, true),
+      { duration: 460, easing: 'cubic-bezier(.55,.02,.35,1)', fill: 'forwards' },
+    ),
+    animateReaderElement(
+      elements.reader,
+      [{ opacity: 1 }, { opacity: 0 }],
+      { duration: 400, easing: 'ease-in', fill: 'forwards' },
+    ),
+  ].filter(Boolean);
 
-  await Promise.allSettled([cardMotion.finished, readerFade.finished]);
-  elements.reader.close();
-  elements.reader.getAnimations?.().forEach((animation) => animation.cancel());
+  await waitForReaderAnimations(readerAnimations, 460);
+  if (elements.reader.open) elements.reader.close();
+  cancelReaderAnimations();
   document.body.classList.remove('detour-reader-open');
   elements.readerStage.innerHTML = '';
   activeThumbnail?.focus({ preventScroll: true });
   activeThumbnail = null;
-  isReaderAnimating = false;
+  isReaderClosing = false;
 }
 
 elements.gallery.addEventListener('click', (event) => {
@@ -324,16 +363,16 @@ let isClosing = false;
 
 function resetCategoryPageState() {
   isClosing = false;
-  isReaderAnimating = false;
+  isReaderClosing = false;
+  cancelReaderAnimations();
   document.body.classList.remove('folder-transition-active', 'detour-reader-open');
   elements.openFolder.classList.remove('open-folder--source-hidden');
   document.querySelectorAll('.folder-transition-backdrop, .open-folder--route-clone').forEach((element) => {
-    element.getAnimations().forEach((animation) => animation.cancel());
+    element.getAnimations?.().forEach((animation) => animation.cancel());
     element.remove();
   });
 
   if (elements.reader.open) elements.reader.close();
-  elements.reader.getAnimations?.().forEach((animation) => animation.cancel());
   elements.readerStage.innerHTML = '';
   activeThumbnail = null;
 }
