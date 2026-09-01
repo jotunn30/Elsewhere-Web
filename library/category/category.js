@@ -307,36 +307,19 @@ function openReader(thumbnail) {
   });
 }
 
-async function closeReader() {
+function closeReader() {
   if (!elements.reader.open || isReaderClosing) return;
 
   isReaderClosing = true;
   cancelReaderAnimations();
-  const readerCard = elements.readerStage.querySelector('.library-reader-card');
-  const sourceCard = activeThumbnail?.querySelector('.gallery-detour-card');
-  const sourceRect = sourceCard?.getBoundingClientRect() ?? {
-    left: window.innerWidth / 2 - 125,
-    top: window.innerHeight / 2 - 110,
-    width: 250,
-    height: 220,
-  };
-  const destinationRect = readerCard.getBoundingClientRect();
-  readerAnimations = [
-    animateReaderElement(
-      readerCard,
-      getReaderMotion(sourceRect, destinationRect, true),
-      { duration: 460, easing: 'cubic-bezier(.55,.02,.35,1)', fill: 'forwards' },
-    ),
-    animateReaderElement(
-      elements.reader,
-      [{ opacity: 1 }, { opacity: 0 }],
-      { duration: 400, easing: 'ease-in', fill: 'forwards' },
-    ),
-  ].filter(Boolean);
 
-  await waitForReaderAnimations(readerAnimations, 460);
-  if (elements.reader.open) elements.reader.close();
-  cancelReaderAnimations();
+  try {
+    elements.reader.close();
+  } catch {
+    elements.reader.removeAttribute('open');
+  }
+  if (elements.reader.open) elements.reader.removeAttribute('open');
+
   document.body.classList.remove('detour-reader-open');
   elements.readerStage.innerHTML = '';
   activeThumbnail?.focus({ preventScroll: true });
