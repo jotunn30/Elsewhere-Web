@@ -71,7 +71,6 @@ document.querySelector('#folder-description').textContent = category.description
 document.querySelector('#folder-image').src = category.image;
 document.title = `${category.title} Detours — Elsewhere`;
 
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const closeLinks = document.querySelectorAll('.folder-back, .site-nav a[href="/library/"]');
 let isClosing = false;
 
@@ -85,7 +84,7 @@ function closeFolder(event) {
   const destination = event.currentTarget.href;
   const folder = document.querySelector('#open-folder');
 
-  if (prefersReducedMotion.matches || typeof folder.animate !== 'function') return;
+  if (typeof folder.animate !== 'function') return;
 
   event.preventDefault();
   isClosing = true;

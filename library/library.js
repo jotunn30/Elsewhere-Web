@@ -1,5 +1,4 @@
 const folders = [...document.querySelectorAll('.category-card')];
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let isNavigating = false;
 
 function isPlainNavigation(event) {
@@ -20,7 +19,7 @@ function openFolder(event) {
   const folder = event.currentTarget;
   const destination = folder.href;
 
-  if (prefersReducedMotion.matches || typeof folder.animate !== 'function') return;
+  if (typeof folder.animate !== 'function') return;
 
   event.preventDefault();
   isNavigating = true;
