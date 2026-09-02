@@ -503,6 +503,135 @@
   white-space: nowrap;
 }
 
+.field-report-summary {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(112px, 34%) minmax(0, 1fr);
+  gap: clamp(14px, 2.4vw, 26px);
+  align-items: center;
+}
+
+.field-report-stamp {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+.field-report-stamp::before {
+  content: '';
+  position: absolute;
+  inset: 7%;
+  border: 1px dashed rgba(48, 45, 103, 0.38);
+  border-radius: 50%;
+}
+
+.field-report-stamp img {
+  display: block;
+  width: 100%;
+  opacity: 0.18;
+  filter: grayscale(0.7);
+  transform: rotate(-6deg);
+}
+
+.field-report-stamp.is-complete img {
+  opacity: 0.92;
+  filter: none;
+}
+
+.field-report-copy > span {
+  display: block;
+  font-size: clamp(0.42rem, 0.65vw, 0.55rem);
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.field-report-copy h2 {
+  margin: 5px 0 9px;
+  color: var(--passport-ink-dark);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.25rem, 2.4vw, 2.25rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+}
+
+.field-report-copy dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 12px;
+  margin: 0;
+}
+
+.field-report-copy dt {
+  font-size: clamp(0.35rem, 0.5vw, 0.44rem);
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.field-report-copy dd {
+  margin: 1px 0 0;
+  overflow: hidden;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(0.53rem, 0.84vw, 0.72rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-report-download,
+.field-report-continue {
+  display: inline-block;
+  margin-top: 9px;
+  padding: 7px 9px 6px;
+  border: 1px solid var(--passport-ink);
+  background: var(--acid);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: clamp(0.37rem, 0.54vw, 0.46rem);
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.field-report-download:disabled { cursor: wait; opacity: 0.6; }
+
+.field-memory-grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: clamp(6px, 1vw, 11px);
+  height: calc(100% - 25px);
+}
+
+.field-memory {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(6px, 0.9vw, 10px);
+  border: 1px solid rgba(48, 45, 103, 0.34);
+  background: rgba(255, 255, 255, 0.22);
+  color: rgba(48, 45, 103, 0.48);
+}
+
+.field-memory.is-complete {
+  border-color: var(--passport-ink);
+  background: rgba(250, 248, 237, 0.46);
+  color: var(--passport-ink);
+}
+
+.field-memory.has-photo { padding-top: clamp(43px, 6.5vw, 68px); }
+.field-memory img { position: absolute; inset: 0 0 auto; display: block; width: 100%; height: clamp(36px, 5.4vw, 58px); object-fit: cover; opacity: 0.82; }
+.field-memory > span { display: block; margin-bottom: 3px; font-size: clamp(0.34rem, 0.48vw, 0.42rem); font-weight: 900; letter-spacing: 0.08em; }
+.field-memory strong { display: block; overflow: hidden; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(0.48rem, 0.76vw, 0.66rem); font-weight: 400; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
+.field-memory p { display: -webkit-box; margin: 4px 0 0; overflow: hidden; font-size: clamp(0.34rem, 0.5vw, 0.43rem); line-height: 1.25; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
 .stamp-grid {
   position: relative;
   z-index: 2;

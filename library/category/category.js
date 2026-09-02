@@ -150,6 +150,24 @@ const detours = [
   },
 ];
 
+const souvenirPrompts = [
+  'What was the seventh yellow sign that brought you here?',
+  'Save the best sentence you overheard — or the one you imagined hearing.',
+  'What grand title did you give your collection of tiny wonders?',
+  'Which song did the stranger choose for the long train ride?',
+  'Write one sentence your future self might remember about this place.',
+  'Describe the door you reached and why you wished you could open it.',
+];
+
+const nextClues = [
+  'Next card: somewhere quiet, with one borrowed sentence.',
+  'Next card: five things smaller than your palm.',
+  'Next card: a soundtrack that belongs to someone else.',
+  'Next card: a memory that has not happened yet.',
+  'Final card: one coin, two directions, no useful destination.',
+  'The complete passport stamp is waiting on the other side.',
+];
+
 const requestedCategory = new URLSearchParams(window.location.search).get('category');
 const categoryKey = Object.hasOwn(categories, requestedCategory) ? requestedCategory : 'free';
 const category = categories[categoryKey];
@@ -174,19 +192,34 @@ const elements = {
   journeyConsole: document.querySelector('#journey-console'),
   journeyAccountState: document.querySelector('#journey-account-state'),
   journeyProgress: document.querySelector('#journey-progress'),
+  journeySetup: document.querySelector('#journey-setup'),
+  journeyStampBuild: document.querySelector('#journey-stamp-build'),
+  journeyStampCount: document.querySelector('#journey-stamp-count'),
   journeyCurrent: document.querySelector('#journey-current'),
   journeyCurrentLabel: document.querySelector('#journey-current-label'),
   journeyCurrentTitle: document.querySelector('#journey-current-title'),
+  journeyCurrentImage: document.querySelector('#journey-current-image'),
+  journeyCurrentInstructions: document.querySelector('#journey-current-instructions'),
+  journeyCardOpen: document.querySelector('#journey-card-open'),
   journeyTimerLabel: document.querySelector('#journey-timer-label'),
   journeyTimer: document.querySelector('#journey-timer'),
   journeyTimeTrack: document.querySelector('#journey-time-track'),
   journeyTimeBar: document.querySelector('#journey-time-bar'),
+  journeyNextClue: document.querySelector('#journey-next-clue'),
+  journeySouvenir: document.querySelector('#journey-souvenir'),
+  journeySouvenirPrompt: document.querySelector('#journey-souvenir-prompt'),
+  journeyMemoryState: document.querySelector('#journey-memory-state'),
+  journeyMemoryNote: document.querySelector('#journey-memory-note'),
+  journeyMemoryPhoto: document.querySelector('#journey-memory-photo'),
+  journeyMemoryPreview: document.querySelector('#journey-memory-preview'),
+  journeyMemorySave: document.querySelector('#journey-memory-save'),
   journeyStart: document.querySelector('#journey-start'),
   journeyBegin: document.querySelector('#journey-begin'),
   journeyPause: document.querySelector('#journey-pause'),
   journeyFinish: document.querySelector('#journey-finish'),
   journeySignin: document.querySelector('#journey-signin'),
   journeyOpenPassport: document.querySelector('#journey-open-passport'),
+  journeyOpenReport: document.querySelector('#journey-open-report'),
   journeyFeedback: document.querySelector('#journey-feedback'),
   reader: document.querySelector('#detour-reader'),
   readerClose: document.querySelector('#detour-reader-close'),
@@ -279,6 +312,11 @@ let journeyBusy = false;
 let journeyPendingMessage = '';
 let journeyRemainingSeconds = 0;
 let journeyTicker = null;
+let journeyMemories = new Map();
+let memorySyncAvailable = true;
+let selectedMemoryBlob = null;
+let selectedMemoryPreviewUrl = '';
+let renderedMemoryStep = -1;
 
 function formatJourneyTime(totalSeconds) {
   const seconds = Math.max(0, Math.ceil(Number(totalSeconds) || 0));
@@ -295,6 +333,122 @@ function stopJourneyTicker() {
   journeyTicker = null;
 }
 
+function journeyPreferenceKey() {
+  return currentUser ? `elsewhere-journey-options-${currentUser.id}` : '';
+}
+
+function journeyMemoryKey() {
+  return currentUser ? `elsewhere-journey-memories-${currentUser.id}` : '';
+}
+
+function readJourneyOptions() {
+  const fallback = { pace: 'one-sitting', company: 'solo' };
+  try {
+    return { ...fallback, ...JSON.parse(window.localStorage.getItem(journeyPreferenceKey()) || '{}') };
+  } catch {
+    return fallback;
+  }
+}
+
+function selectedJourneyOptions() {
+  const pace = elements.journeySetup.querySelector('input[name="journey-pace"]:checked')?.value || 'one-sitting';
+  const company = elements.journeySetup.querySelector('input[name="journey-company"]:checked')?.value || 'solo';
+  return { pace, company };
+}
+
+function applyJourneyOptions(options = readJourneyOptions()) {
+  const pace = elements.journeySetup.querySelector(`input[name="journey-pace"][value="${options.pace}"]`);
+  const company = elements.journeySetup.querySelector(`input[name="journey-company"][value="${options.company}"]`);
+  if (pace) pace.checked = true;
+  if (company) company.checked = true;
+}
+
+function storeJourneyOptions(options) {
+  try {
+    window.localStorage.setItem(journeyPreferenceKey(), JSON.stringify(options));
+  } catch {
+    // The database remains authoritative even if local preferences are unavailable.
+  }
+}
+
+function loadLocalJourneyMemories() {
+  if (!currentUser) return new Map();
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(journeyMemoryKey()) || '{}');
+    return new Map(Object.entries(stored).map(([key, value]) => [Number(key), value]));
+  } catch {
+    return new Map();
+  }
+}
+
+function storeLocalJourneyMemories() {
+  if (!currentUser) return;
+  try {
+    window.localStorage.setItem(journeyMemoryKey(), JSON.stringify(Object.fromEntries(journeyMemories)));
+  } catch {
+    // A large image can exceed browser draft storage; the Supabase copy is still kept.
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(reader.result));
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function compressJourneyPhoto(file) {
+  if (!file?.type?.startsWith('image/')) throw new Error('Choose a JPEG, PNG, or WebP image.');
+  if (file.size > 12 * 1024 * 1024) throw new Error('Choose a photo smaller than 12 MB.');
+
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 960;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('That photo could not be prepared.')), 'image/jpeg', 0.76);
+  });
+}
+
+function renderStampProgress(currentStep, status) {
+  const completed = status === 'completed' ? detours.length : Math.max(0, Math.min(currentStep, detours.length));
+  const progress = `${Math.round((completed / detours.length) * 100)}%`;
+  elements.journeyStampBuild.style.setProperty('--stamp-progress', progress);
+  elements.journeyStampCount.textContent = completed === detours.length
+    ? 'Stamp complete'
+    : `${completed} of ${detours.length} impressions`;
+}
+
+function renderCurrentMemory(stepIndex, status) {
+  const shouldShow = stepIndex < detours.length && status !== 'not_started' && status !== 'completed';
+  elements.journeySouvenir.hidden = !shouldShow;
+  if (!shouldShow) return;
+
+  const memory = journeyMemories.get(stepIndex) || {};
+  elements.journeySouvenirPrompt.textContent = souvenirPrompts[stepIndex];
+  elements.journeyMemoryState.textContent = memory.savedRemotely
+    ? 'Saved to your passport'
+    : (memory.note || memory.previewUrl ? 'Draft saved on this device' : 'Private to your passport');
+
+  if (renderedMemoryStep !== stepIndex) {
+    renderedMemoryStep = stepIndex;
+    elements.journeyMemoryNote.value = memory.note || '';
+    selectedMemoryBlob = null;
+    if (selectedMemoryPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(selectedMemoryPreviewUrl);
+    selectedMemoryPreviewUrl = memory.previewUrl || memory.photoDataUrl || '';
+    elements.journeyMemoryPreview.src = selectedMemoryPreviewUrl;
+    elements.journeyMemoryPreview.hidden = !selectedMemoryPreviewUrl;
+    elements.journeyMemoryPhoto.value = '';
+  }
+}
+
 function updateJourneyTimerDisplay() {
   if (categoryKey !== 'free' || !journeyState || journeyState.status === 'not_started') return;
 
@@ -304,16 +458,18 @@ function updateJourneyTimerDisplay() {
     ? Math.min(100, Math.round((elapsedSeconds / requiredSeconds) * 100))
     : 100;
 
-  elements.journeyTimer.textContent = formatJourneyTime(journeyRemainingSeconds);
-  elements.journeyTimeBar.style.width = `${percentage}%`;
+  const checkInReady = journeyState.status === 'active' && journeyRemainingSeconds <= 0;
+  elements.journeyTimer.textContent = checkInReady ? 'CHECK IN' : (journeyState.status === 'active' ? 'IN THE FIELD' : 'READY');
+  elements.journeyTimeTrack.style.setProperty('--journey-progress', `${percentage}%`);
   elements.journeyTimeTrack.setAttribute('aria-valuenow', String(percentage));
+  elements.journeyTimeTrack.setAttribute('aria-valuetext', checkInReady ? 'Required active time complete' : `${percentage}% of the required active time completed`);
   elements.journeyFinish.disabled = journeyBusy || journeyRemainingSeconds > 0;
 
-  if (journeyState.status === 'active' && journeyRemainingSeconds <= 0) {
-    elements.journeyTimerLabel.textContent = 'Required active time complete';
+  if (checkInReady) {
+    elements.journeyTimerLabel.textContent = 'Your check-in is open';
     elements.journeyFeedback.textContent = Number(journeyState.current_step) === detours.length - 1
-      ? 'The final Finish is ready. Supabase will validate all six detours and stamp your Passport.'
-      : 'This detour is ready to finish. The next detour will unlock afterward.';
+      ? 'Return when you are ready. Your final check-in completes the stamp and field report.'
+      : 'Return when you are ready. Check in to reveal the next detour.';
   }
 }
 
@@ -374,6 +530,8 @@ function renderJourney() {
   elements.journeyFinish.hidden = true;
   elements.journeySignin.hidden = true;
   elements.journeyOpenPassport.hidden = true;
+  elements.journeyOpenReport.hidden = true;
+  elements.journeySetup.hidden = true;
   elements.journeyCurrent.hidden = true;
   elements.journeyConsole.classList.remove('is-complete');
 
@@ -383,6 +541,7 @@ function renderJourney() {
     elements.journeySignin.hidden = false;
     elements.journeyFeedback.textContent = 'Sign in before starting. Free detour previews stay open to everyone.';
     updateJourneyCards(0, 'not_started');
+    renderStampProgress(0, 'not_started');
     return;
   }
 
@@ -392,6 +551,7 @@ function renderJourney() {
     elements.journeyStart.disabled = true;
     elements.journeyFeedback.textContent = journeyError;
     updateJourneyCards(0, 'not_started');
+    renderStampProgress(0, 'not_started');
     return;
   }
 
@@ -399,18 +559,22 @@ function renderJourney() {
     elements.journeyStart.disabled = true;
     elements.journeyFeedback.textContent = journeyBusy ? journeyPendingMessage : 'Loading Journey Mode…';
     updateJourneyCards(0, 'not_started');
+    renderStampProgress(0, 'not_started');
     return;
   }
 
   const status = journeyState.status;
   const currentStep = Math.min(Number(journeyState.current_step) || 0, detours.length);
   updateJourneyCards(currentStep, status);
+  renderStampProgress(currentStep, status);
 
   if (status === 'not_started') {
+    elements.journeySetup.hidden = false;
+    applyJourneyOptions();
     elements.journeyStart.disabled = journeyBusy;
     elements.journeyFeedback.textContent = journeyBusy
       ? journeyPendingMessage
-      : 'Ready when you are. Starting creates a private six-detour field record.';
+      : 'Choose a pace and company. Your first detour will be revealed after you start.';
     return;
   }
 
@@ -419,9 +583,10 @@ function renderJourney() {
   if (status === 'completed') {
     elements.journeyConsole.classList.add('is-complete');
     elements.journeyOpenPassport.hidden = false;
+    elements.journeyOpenReport.hidden = false;
     elements.journeyFeedback.textContent = journeyState.stamp_code
-      ? `Free Journey completed. Stamp ${journeyState.stamp_code} is filed in your Passport.`
-      : 'Free Journey completed. Your stamp is filed in your Passport.';
+      ? `Free Journey completed. Stamp ${journeyState.stamp_code} and your field report are filed in your Passport.`
+      : 'Free Journey completed. Your stamp and field report are filed in your Passport.';
     return;
   }
 
@@ -429,18 +594,23 @@ function renderJourney() {
   elements.journeyCurrent.hidden = false;
   elements.journeyCurrentLabel.textContent = `Detour ${String(currentStep + 1).padStart(2, '0')} of ${detours.length}`;
   elements.journeyCurrentTitle.textContent = detour.title;
+  elements.journeyCurrentImage.src = detour.image;
+  elements.journeyCurrentImage.alt = detour.imageAlt;
+  elements.journeyCurrentInstructions.textContent = detour.instructions;
+  elements.journeyNextClue.textContent = nextClues[currentStep];
   journeyRemainingSeconds = Number(journeyState.remaining_seconds ?? detour.durationSeconds);
+  renderCurrentMemory(currentStep, status);
 
   if (status === 'ready' || status === 'paused') {
     elements.journeyBegin.hidden = false;
     elements.journeyBegin.disabled = journeyBusy;
     elements.journeyBegin.textContent = status === 'paused' ? 'Resume' : 'Begin';
-    elements.journeyTimerLabel.textContent = status === 'paused' ? 'Paused with active time remaining' : 'Required active time';
+    elements.journeyTimerLabel.textContent = status === 'paused' ? 'Your detour is safely paused' : 'Ready to leave';
     elements.journeyFeedback.textContent = journeyBusy
       ? journeyPendingMessage
       : (status === 'paused'
-        ? 'Paused safely in Supabase. Resume whenever you are ready.'
-        : 'Begin starts the Supabase timer for this detour. Later detours cannot be completed early.');
+        ? 'Resume whenever you are ready. Your active time has been kept.'
+        : 'Begin when you are actually leaving. We will quietly open check-in when the detour has had enough time.');
   }
 
   if (status === 'active') {
@@ -448,12 +618,12 @@ function renderJourney() {
     elements.journeyFinish.hidden = false;
     elements.journeyPause.disabled = journeyBusy;
     elements.journeyFinish.textContent = currentStep === detours.length - 1
-      ? 'Finish Journey & Stamp Passport'
-      : 'Finish';
-    elements.journeyTimerLabel.textContent = 'Active time remaining';
+      ? 'Complete Journey & Stamp Passport'
+      : 'Check in & Reveal Next';
+    elements.journeyTimerLabel.textContent = 'Detour in progress';
     elements.journeyFeedback.textContent = journeyBusy
       ? journeyPendingMessage
-      : 'Timer active. Pause if you stop; Finish unlocks only when the required time has passed.';
+      : 'Go do the detour — you can put your phone away. Return when something catches your attention or you are ready to check in.';
   }
 
   updateJourneyTimerDisplay();
@@ -468,13 +638,20 @@ function journeyErrorMessage(error) {
   return message;
 }
 
-async function callJourneyRpc(functionName, pendingMessage) {
+function isMissingJourneyFunction(error) {
+  return /schema cache|could not find the function|PGRST202/i.test(error?.message || '');
+}
+
+async function callJourneyRpc(functionName, pendingMessage, rpcArgs, fallbackFunctionName = '') {
   if (!currentUser || categoryKey !== 'free' || journeyBusy) return null;
 
   journeyBusy = true;
   journeyPendingMessage = pendingMessage;
   renderJourney();
-  const { data, error } = await supabase.rpc(functionName);
+  let { data, error } = await supabase.rpc(functionName, rpcArgs);
+  if (error && fallbackFunctionName && isMissingJourneyFunction(error)) {
+    ({ data, error } = await supabase.rpc(fallbackFunctionName));
+  }
   journeyBusy = false;
 
   if (error) {
@@ -488,7 +665,7 @@ async function callJourneyRpc(functionName, pendingMessage) {
   renderJourney();
 
   if (data?.ok === false && data.code === 'time_remaining') {
-    elements.journeyFeedback.textContent = `Supabase kept this detour open. ${formatJourneyTime(data.remaining_seconds)} of active time remains.`;
+    elements.journeyFeedback.textContent = 'Your check-in is not open yet. Keep exploring — we will let you know when it is ready.';
   } else if (data?.ok === false && data.code === 'detour_not_active') {
     elements.journeyFeedback.textContent = 'Begin or resume the current detour before finishing it.';
   }
@@ -499,6 +676,42 @@ async function callJourneyRpc(functionName, pendingMessage) {
   }
 
   return data;
+}
+
+async function loadJourneyMemories() {
+  if (!currentUser || categoryKey !== 'free') return;
+  journeyMemories = loadLocalJourneyMemories();
+  renderedMemoryStep = -1;
+  memorySyncAvailable = true;
+
+  const { data, error } = await supabase
+    .from('journey_memories')
+    .select('step_index, prompt, note, photo_path, updated_at')
+    .eq('user_id', currentUser.id)
+    .eq('journey_id', 'free')
+    .order('step_index', { ascending: true });
+
+  if (error) {
+    memorySyncAvailable = false;
+    return;
+  }
+
+  for (const row of data || []) {
+    let previewUrl = '';
+    if (row.photo_path) {
+      const signed = await supabase.storage.from('journey-souvenirs').createSignedUrl(row.photo_path, 60 * 60);
+      previewUrl = signed.data?.signedUrl || '';
+    }
+    journeyMemories.set(Number(row.step_index), {
+      prompt: row.prompt,
+      note: row.note || '',
+      photoPath: row.photo_path || '',
+      previewUrl,
+      updatedAt: row.updated_at,
+      savedRemotely: true,
+    });
+  }
+  storeLocalJourneyMemories();
 }
 
 async function loadJourneyState() {
@@ -515,7 +728,14 @@ async function loadJourneyState() {
   } else {
     journeyError = '';
     journeyState = data;
+    if (journeyState.pace || journeyState.company) {
+      storeJourneyOptions({
+        pace: journeyState.pace || 'one-sitting',
+        company: journeyState.company || 'solo',
+      });
+    }
   }
+  await loadJourneyMemories();
   renderJourney();
 }
 
@@ -523,22 +743,137 @@ async function syncLibrarySession(session) {
   currentUser = session?.user ?? null;
   journeyState = null;
   journeyError = '';
+  journeyMemories = new Map();
+  renderedMemoryStep = -1;
   renderMemberPreview();
   renderJourney();
   if (currentUser) await loadJourneyState();
 }
 
+async function saveJourneyMemory({ quiet = false } = {}) {
+  const stepIndex = Number(journeyState?.current_step);
+  if (!currentUser || !Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= detours.length) return false;
+
+  const note = elements.journeyMemoryNote.value.trim();
+  const existing = journeyMemories.get(stepIndex) || {};
+  if (!note && !selectedMemoryBlob && !existing.photoPath && !existing.photoDataUrl) {
+    if (!quiet) elements.journeyMemoryState.textContent = 'Add a note or photo first';
+    return false;
+  }
+
+  elements.journeyMemorySave.disabled = true;
+  elements.journeyMemoryState.textContent = 'Saving your souvenir…';
+  let photoDataUrl = existing.photoDataUrl || '';
+  if (selectedMemoryBlob) {
+    try {
+      photoDataUrl = await blobToDataUrl(selectedMemoryBlob);
+    } catch {
+      photoDataUrl = '';
+    }
+  }
+
+  const localMemory = {
+    ...existing,
+    prompt: souvenirPrompts[stepIndex],
+    note,
+    photoDataUrl,
+    previewUrl: selectedMemoryPreviewUrl || existing.previewUrl || photoDataUrl,
+    updatedAt: new Date().toISOString(),
+    savedRemotely: false,
+  };
+  journeyMemories.set(stepIndex, localMemory);
+  storeLocalJourneyMemories();
+
+  let photoPath = existing.photoPath || '';
+  let remoteSaved = memorySyncAvailable;
+  if (remoteSaved && selectedMemoryBlob) {
+    photoPath = `${currentUser.id}/free/${journeyState.run_id || 'journey'}/detour-${stepIndex + 1}.jpg`;
+    const upload = await supabase.storage
+      .from('journey-souvenirs')
+      .upload(photoPath, selectedMemoryBlob, { contentType: 'image/jpeg', upsert: true });
+    remoteSaved = !upload.error;
+  }
+
+  if (remoteSaved) {
+    const saved = await supabase.rpc('save_free_journey_memory', {
+      p_step_index: stepIndex,
+      p_prompt: souvenirPrompts[stepIndex],
+      p_note: note,
+      p_photo_path: photoPath || null,
+    });
+    remoteSaved = !saved.error;
+  }
+
+  if (remoteSaved) {
+    journeyMemories.set(stepIndex, {
+      ...localMemory,
+      photoPath,
+      savedRemotely: true,
+    });
+    storeLocalJourneyMemories();
+    elements.journeyMemoryState.textContent = 'Saved to your passport';
+  } else {
+    memorySyncAvailable = false;
+    elements.journeyMemoryState.textContent = 'Saved on this device';
+    if (!quiet) {
+      elements.journeyFeedback.textContent = 'Souvenir kept safely on this device. Run the latest setup.sql once to sync it across devices.';
+    }
+  }
+
+  selectedMemoryBlob = null;
+  elements.journeyMemoryPhoto.value = '';
+  elements.journeyMemorySave.disabled = false;
+  return true;
+}
+
 elements.journeyStart.addEventListener('click', () => {
-  callJourneyRpc('start_free_journey', 'Starting your Free Journey…');
+  const options = selectedJourneyOptions();
+  storeJourneyOptions(options);
+  callJourneyRpc(
+    'start_free_journey_with_options',
+    'Registering your route in the passport…',
+    {
+      p_pace: options.pace,
+      p_company: options.company,
+      p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    },
+    'start_free_journey',
+  );
 });
 elements.journeyBegin.addEventListener('click', () => {
-  callJourneyRpc('begin_free_journey_step', 'Starting the Supabase timer…');
+  callJourneyRpc('begin_free_journey_step', 'Opening this detour…');
 });
 elements.journeyPause.addEventListener('click', () => {
   callJourneyRpc('pause_free_journey_step', 'Saving your active time…');
 });
-elements.journeyFinish.addEventListener('click', () => {
-  callJourneyRpc('finish_free_journey_step', 'Verifying this detour…');
+elements.journeyFinish.addEventListener('click', async () => {
+  await saveJourneyMemory({ quiet: true });
+  callJourneyRpc('finish_free_journey_step', 'Checking in and revealing what comes next…');
+});
+
+elements.journeyMemorySave.addEventListener('click', () => saveJourneyMemory());
+elements.journeyMemoryPhoto.addEventListener('change', async () => {
+  const file = elements.journeyMemoryPhoto.files?.[0];
+  if (!file) return;
+  elements.journeyMemoryState.textContent = 'Preparing photo…';
+  try {
+    selectedMemoryBlob = await compressJourneyPhoto(file);
+    if (selectedMemoryPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(selectedMemoryPreviewUrl);
+    selectedMemoryPreviewUrl = URL.createObjectURL(selectedMemoryBlob);
+    elements.journeyMemoryPreview.src = selectedMemoryPreviewUrl;
+    elements.journeyMemoryPreview.hidden = false;
+    elements.journeyMemoryState.textContent = 'Photo ready to save';
+  } catch (error) {
+    selectedMemoryBlob = null;
+    elements.journeyMemoryPhoto.value = '';
+    elements.journeyMemoryState.textContent = error.message;
+  }
+});
+
+elements.journeyCardOpen.addEventListener('click', () => {
+  const stepIndex = Number(journeyState?.current_step);
+  const thumbnail = elements.gallery.querySelector(`[data-detour-index="${stepIndex}"]`);
+  if (thumbnail) openReader(thumbnail);
 });
 
 function closeStampAward() {
@@ -560,6 +895,12 @@ await syncLibrarySession(librarySessionData.session);
 
 supabase.auth.onAuthStateChange((_event, session) => {
   window.setTimeout(() => syncLibrarySession(session), 0);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentUser && journeyState?.status === 'active' && !journeyBusy) {
+    loadJourneyState();
+  }
 });
 
 let activeThumbnail = null;

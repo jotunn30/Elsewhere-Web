@@ -1,5 +1,6 @@
 -- Elsewhere Passport database setup
--- Run once in Supabase: SQL Editor -> New query -> paste this file -> Run.
+-- Run the whole file in Supabase after each database update:
+-- SQL Editor -> New query -> paste this file -> Run. It is idempotent.
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -149,6 +150,14 @@ create table if not exists public.journey_runs (
   unique (user_id, journey_id)
 );
 
+alter table public.journey_runs
+  add column if not exists pace text not null default 'one-sitting'
+    check (pace in ('one-sitting', 'take-your-time')),
+  add column if not exists company text not null default 'solo'
+    check (company in ('solo', 'with-a-friend')),
+  add column if not exists timezone_name text not null default 'UTC'
+    check (char_length(timezone_name) <= 80);
+
 create table if not exists public.journey_step_completions (
   id uuid primary key default gen_random_uuid(),
   journey_run_id uuid not null references public.journey_runs(id) on delete cascade,
@@ -162,20 +171,40 @@ create table if not exists public.journey_step_completions (
   unique (journey_run_id, step_index)
 );
 
+create table if not exists public.journey_memories (
+  id uuid primary key default gen_random_uuid(),
+  journey_run_id uuid not null references public.journey_runs(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  journey_id text not null check (char_length(journey_id) <= 120),
+  step_index smallint not null check (step_index between 0 and 5),
+  prompt text not null default '' check (char_length(prompt) <= 240),
+  note text not null default '' check (char_length(note) <= 600),
+  photo_path text check (photo_path is null or char_length(photo_path) <= 500),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, journey_id, step_index)
+);
+
 create index if not exists journey_runs_user_updated_idx
   on public.journey_runs (user_id, updated_at desc);
 
 create index if not exists journey_step_completions_user_idx
   on public.journey_step_completions (user_id, completed_at asc);
 
+create index if not exists journey_memories_user_idx
+  on public.journey_memories (user_id, journey_id, step_index);
+
 alter table public.journey_runs enable row level security;
 alter table public.journey_step_completions enable row level security;
+alter table public.journey_memories enable row level security;
 
 revoke all on table public.journey_runs from anon, authenticated;
 revoke all on table public.journey_step_completions from anon, authenticated;
+revoke all on table public.journey_memories from anon, authenticated;
 grant select on table public.journey_runs to authenticated;
 grant select on table public.journey_step_completions to authenticated;
-grant all on table public.journey_runs, public.journey_step_completions to service_role;
+grant select on table public.journey_memories to authenticated;
+grant all on table public.journey_runs, public.journey_step_completions, public.journey_memories to service_role;
 
 drop policy if exists "Users can read their own journey runs" on public.journey_runs;
 create policy "Users can read their own journey runs"
@@ -188,6 +217,66 @@ create policy "Users can read their own journey completions"
   on public.journey_step_completions for select
   to authenticated
   using ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can read their own journey memories" on public.journey_memories;
+create policy "Users can read their own journey memories"
+  on public.journey_memories for select
+  to authenticated
+  using ((select auth.uid()) = user_id);
+
+-- Private photo storage. The first path segment must always be the owner's id.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'journey-souvenirs',
+  'journey-souvenirs',
+  false,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Journey owners can view souvenir photos" on storage.objects;
+create policy "Journey owners can view souvenir photos"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'journey-souvenirs'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Journey owners can add souvenir photos" on storage.objects;
+create policy "Journey owners can add souvenir photos"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'journey-souvenirs'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Journey owners can update souvenir photos" on storage.objects;
+create policy "Journey owners can update souvenir photos"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'journey-souvenirs'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  )
+  with check (
+    bucket_id = 'journey-souvenirs'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Journey owners can remove souvenir photos" on storage.objects;
+create policy "Journey owners can remove souvenir photos"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'journey-souvenirs'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 create or replace function public.free_journey_required_seconds(step_number integer)
 returns integer
@@ -238,6 +327,9 @@ begin
       'elapsed_seconds', 0,
       'required_seconds', public.free_journey_required_seconds(0),
       'remaining_seconds', public.free_journey_required_seconds(0),
+      'pace', 'one-sitting',
+      'company', 'solo',
+      'timezone_name', 'UTC',
       'stamp_awarded', false,
       'server_now', clock_timestamp()
     );
@@ -263,6 +355,9 @@ begin
     'elapsed_seconds', elapsed,
     'required_seconds', required,
     'remaining_seconds', greatest(required - elapsed, 0),
+    'pace', journey.pace,
+    'company', journey.company,
+    'timezone_name', journey.timezone_name,
     'started_at', journey.started_at,
     'completed_at', journey.completed_at,
     'stamp_awarded', exists (
@@ -307,6 +402,131 @@ begin
   on conflict (user_id, journey_id) do nothing;
 
   return public.get_free_journey_status();
+end;
+$$;
+
+create or replace function public.start_free_journey_with_options(
+  p_pace text,
+  p_company text,
+  p_timezone text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  traveler_id uuid := auth.uid();
+  selected_pace text := case when p_pace = 'take-your-time' then p_pace else 'one-sitting' end;
+  selected_company text := case when p_company = 'with-a-friend' then p_company else 'solo' end;
+  selected_timezone text := coalesce(nullif(left(p_timezone, 80), ''), 'UTC');
+begin
+  if traveler_id is null then
+    raise exception using errcode = '42501', message = 'Sign in before starting the journey.';
+  end if;
+
+  if not exists (select 1 from pg_catalog.pg_timezone_names where name = selected_timezone) then
+    selected_timezone := 'UTC';
+  end if;
+
+  insert into public.journey_runs as existing (
+    user_id,
+    journey_id,
+    pace,
+    company,
+    timezone_name
+  ) values (
+    traveler_id,
+    'free',
+    selected_pace,
+    selected_company,
+    selected_timezone
+  )
+  on conflict (user_id, journey_id) do update
+  set pace = case
+        when existing.current_step = 0 and existing.status = 'ready' then excluded.pace
+        else existing.pace
+      end,
+      company = case
+        when existing.current_step = 0 and existing.status = 'ready' then excluded.company
+        else existing.company
+      end,
+      timezone_name = case
+        when existing.current_step = 0 and existing.status = 'ready' then excluded.timezone_name
+        else existing.timezone_name
+      end,
+      updated_at = clock_timestamp();
+
+  return public.get_free_journey_status();
+end;
+$$;
+
+create or replace function public.save_free_journey_memory(
+  p_step_index integer,
+  p_prompt text,
+  p_note text,
+  p_photo_path text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  traveler_id uuid := auth.uid();
+  journey public.journey_runs%rowtype;
+  clean_prompt text := left(coalesce(p_prompt, ''), 240);
+  clean_note text := left(coalesce(p_note, ''), 600);
+  clean_photo_path text := nullif(left(coalesce(p_photo_path, ''), 500), '');
+begin
+  if traveler_id is null then
+    raise exception using errcode = '42501', message = 'Sign in before saving a journey souvenir.';
+  end if;
+
+  select * into journey
+  from public.journey_runs
+  where user_id = traveler_id and journey_id = 'free'
+  limit 1;
+
+  if not found then
+    raise exception using errcode = 'P0001', message = 'Start the Free Journey before saving a souvenir.';
+  end if;
+
+  if p_step_index < 0
+     or p_step_index > 5
+     or p_step_index > least(journey.current_step, 5) then
+    raise exception using errcode = 'P0001', message = 'That detour has not been revealed yet.';
+  end if;
+
+  if clean_photo_path is not null
+     and position(traveler_id::text || '/' in clean_photo_path) <> 1 then
+    raise exception using errcode = '42501', message = 'Invalid souvenir photo path.';
+  end if;
+
+  insert into public.journey_memories as existing (
+    journey_run_id,
+    user_id,
+    journey_id,
+    step_index,
+    prompt,
+    note,
+    photo_path
+  ) values (
+    journey.id,
+    traveler_id,
+    'free',
+    p_step_index,
+    clean_prompt,
+    clean_note,
+    clean_photo_path
+  )
+  on conflict (user_id, journey_id, step_index) do update
+  set prompt = excluded.prompt,
+      note = excluded.note,
+      photo_path = coalesce(excluded.photo_path, existing.photo_path),
+      updated_at = clock_timestamp();
+
+  return jsonb_build_object('ok', true, 'step_index', p_step_index, 'saved_at', clock_timestamp());
 end;
 $$;
 
@@ -503,18 +723,23 @@ $$;
 
 revoke execute on function public.get_free_journey_status() from public, anon;
 revoke execute on function public.start_free_journey() from public, anon;
+revoke execute on function public.start_free_journey_with_options(text, text, text) from public, anon;
+revoke execute on function public.save_free_journey_memory(integer, text, text, text) from public, anon;
 revoke execute on function public.begin_free_journey_step() from public, anon;
 revoke execute on function public.pause_free_journey_step() from public, anon;
 revoke execute on function public.finish_free_journey_step() from public, anon;
 
 grant execute on function public.get_free_journey_status() to authenticated;
 grant execute on function public.start_free_journey() to authenticated;
+grant execute on function public.start_free_journey_with_options(text, text, text) to authenticated;
+grant execute on function public.save_free_journey_memory(integer, text, text, text) to authenticated;
 grant execute on function public.begin_free_journey_step() to authenticated;
 grant execute on function public.pause_free_journey_step() to authenticated;
 grant execute on function public.finish_free_journey_step() to authenticated;
 
 -- Journey security model:
 -- Authenticated users can read only their own journey state. They cannot write
--- progression, elapsed time, completion rows, reward codes, or stamps directly.
+-- progression, elapsed time, completion rows, reward codes, memories, or stamps directly.
 -- The security-definer RPC functions use Supabase server time, enforce the six
--- detours in order, and award the Free Journey stamp only after all six timers.
+-- detours in order, protect memory ownership, and award the Free Journey stamp
+-- only after all six active-time checks.
