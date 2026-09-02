@@ -55,7 +55,67 @@
             </div>
           </header>
 
+          <section class="journey-console" id="journey-console" aria-labelledby="journey-title" hidden>
+            <div class="journey-console__stamp">
+              <p>Completion stamp</p>
+              <img src="/stamps/free-journey.png" alt="Elsewhere Free Journey passport stamp" />
+            </div>
+
+            <div class="journey-console__body">
+              <div class="journey-console__topline">
+                <span>Journey 01</span>
+                <span id="journey-account-state">Checking passport…</span>
+              </div>
+              <h2 id="journey-title">THE FREE JOURNEY</h2>
+              <p class="journey-console__description">Complete all six detours in order. Supabase keeps the active time, even when you pause and return later.</p>
+
+              <div class="journey-benefits" aria-label="Free Journey completion rewards">
+                <span>Passport stamp</span>
+                <span>10% first paid journey</span>
+                <span>1 Field Kit draw entry</span>
+              </div>
+
+              <ol class="journey-progress" id="journey-progress" aria-label="Free Journey progress"></ol>
+
+              <div class="journey-current" id="journey-current" hidden>
+                <p id="journey-current-label">Current detour</p>
+                <h3 id="journey-current-title"></h3>
+                <div class="journey-timer-row">
+                  <span id="journey-timer-label">Active time remaining</span>
+                  <strong id="journey-timer">00:00</strong>
+                </div>
+                <div class="journey-time-track" role="progressbar" id="journey-time-track" aria-label="Current detour active time" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                  <span id="journey-time-bar"></span>
+                </div>
+              </div>
+
+              <div class="journey-controls" id="journey-controls">
+                <button class="journey-button journey-button--primary" id="journey-start" type="button" disabled>Start the Journey</button>
+                <button class="journey-button journey-button--primary" id="journey-begin" type="button" hidden>Begin</button>
+                <button class="journey-button" id="journey-pause" type="button" hidden>Pause</button>
+                <button class="journey-button journey-button--finish" id="journey-finish" type="button" hidden>Finish</button>
+                <a class="journey-button journey-button--signin" id="journey-signin" href="/passport/?returnTo=%2Flibrary%2Fcategory%2F%3Fcategory%3Dfree" hidden>Sign in through Passport</a>
+                <a class="journey-button journey-button--passport" id="journey-open-passport" href="/passport/" hidden>Open Passport</a>
+              </div>
+
+              <p class="journey-feedback" id="journey-feedback" role="status" aria-live="polite">Sign in before starting. Each Finish is checked against Supabase time.</p>
+            </div>
+          </section>
+
           <div class="detour-gallery" id="detour-gallery" aria-label="Free detours in sequence" hidden></div>
+
+          <section class="member-preview" id="member-preview" aria-labelledby="member-preview-title" hidden>
+            <div class="member-preview__cards" aria-hidden="true">
+              <div><span>Detour preview</span><strong>01</strong></div>
+              <div><span>Detour preview</span><strong>02</strong></div>
+              <div><span>Detour preview</span><strong>03</strong></div>
+            </div>
+            <div class="member-preview__copy">
+              <p>Member folder preview</p>
+              <h2 id="member-preview-title">Sign in to bring these detours into focus.</h2>
+              <a id="member-preview-signin" href="/passport/">Open Passport to sign in <span aria-hidden="true">↗</span></a>
+            </div>
+          </section>
 
           <div class="folder-empty" id="folder-summary" role="status">
             <span class="folder-empty__mark" id="folder-summary-mark" aria-hidden="true">↗</span>
@@ -80,6 +140,20 @@
         <span aria-hidden="true">×</span>
       </button>
       <div class="detour-reader__stage" id="detour-reader-stage"></div>
+    </dialog>
+
+    <dialog class="stamp-award" id="stamp-award" aria-labelledby="stamp-award-title">
+      <button class="stamp-award__close" id="stamp-award-close" type="button" aria-label="Close stamp reward">×</button>
+      <div class="stamp-award__impression">
+        <img src="/stamps/free-journey.png" alt="" />
+      </div>
+      <div class="stamp-award__copy">
+        <p>Journey complete · 6 of 6</p>
+        <h2 id="stamp-award-title">Your passport has been stamped.</h2>
+        <p>The Free Journey stamp includes 10% off your first paid journey and one entry in the Elsewhere Field Kit draw.</p>
+        <p class="stamp-award__code">Reward code <strong id="stamp-award-code">SYNCING</strong></p>
+        <a href="/passport/">Open your Passport <span aria-hidden="true">→</span></a>
+      </div>
     </dialog>
     <script type="module" src="/library/category/category.js"></script>
   </body>

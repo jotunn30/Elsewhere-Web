@@ -19,6 +19,26 @@ const profileHomeBaseInput = document.querySelector('#profile-home-base');
 const authFeedback = document.querySelector('#passport-auth-feedback');
 const accountDescription = document.querySelector('#account-description');
 const syncNote = document.querySelector('#passport-sync-note');
+const stampBenefits = document.querySelector('#passport-benefits');
+const stampBenefitsList = document.querySelector('#passport-benefits-list');
+const requestedReturnTo = new URLSearchParams(window.location.search).get('returnTo');
+let rememberedReturnTo = '';
+try {
+  rememberedReturnTo = window.localStorage.getItem('elsewhere-return-to') ?? '';
+} catch {
+  rememberedReturnTo = '';
+}
+const returnToCandidate = requestedReturnTo || rememberedReturnTo;
+const safeReturnTo = returnToCandidate?.startsWith('/') && !returnToCandidate.startsWith('//')
+  ? returnToCandidate
+  : '';
+if (requestedReturnTo && safeReturnTo) {
+  try {
+    window.localStorage.setItem('elsewhere-return-to', safeReturnTo);
+  } catch {
+    // Returning is optional; authentication still works without browser storage.
+  }
+}
 
 const signedOutProfile = {
   name: 'SIGN IN TO COMPLETE',
@@ -34,6 +54,15 @@ const totalSpreads = 4;
 const backCoverPosition = totalSpreads + 1;
 let currentPosition = 0;
 let isTurning = false;
+let isReturningToJourney = false;
+
+const stampCatalog = {
+  'free-journey': {
+    name: 'FREE JOURNEY',
+    image: '/stamps/free-journey.png',
+    fallbackBenefit: '10% OFF · 1 DRAW',
+  },
+};
 
 function escapeHtml(value) {
   return String(value)
@@ -50,11 +79,27 @@ function stampSpaces(start, count = 6) {
 
     if (earnedStamp) {
       const detourName = earnedStamp.detour_id.replaceAll('-', ' ').toUpperCase();
+      const categoryStamp = stampCatalog[earnedStamp.detour_id];
       const awardedDate = new Intl.DateTimeFormat('en', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       }).format(new Date(earnedStamp.awarded_at));
+
+      if (categoryStamp) {
+        const discount = Number(earnedStamp.discount_percent) || 0;
+        const entries = Number(earnedStamp.prize_entries) || 0;
+        const benefit = discount || entries
+          ? `${discount}% OFF · ${entries} ${entries === 1 ? 'DRAW' : 'DRAWS'}`
+          : categoryStamp.fallbackBenefit;
+        const rewardCode = earnedStamp.stamp_code ? ` · CODE ${earnedStamp.stamp_code}` : '';
+        return `
+          <div class="stamp-space is-earned is-category-stamp" aria-label="${escapeHtml(categoryStamp.name)}, earned ${escapeHtml(awardedDate)}. ${escapeHtml(benefit)}${escapeHtml(rewardCode)}">
+            <img class="passport-stamp-image" src="${categoryStamp.image}" alt="" />
+            <span class="passport-stamp-meta"><b>${escapeHtml(awardedDate)}</b><small>${escapeHtml(benefit)}</small></span>
+          </div>`;
+      }
+
       return `<div class="stamp-space is-earned" aria-label="${escapeHtml(detourName)}, earned ${escapeHtml(awardedDate)}"><span>${escapeHtml(detourName)}</span></div>`;
     }
 
@@ -314,10 +359,27 @@ function refreshVisibleSpread() {
   if (currentPosition > 0 && currentPosition <= totalSpreads && !isTurning) renderSpread(currentPosition);
 }
 
+function renderStampBenefits() {
+  const benefitStamps = passportStamps.filter((stamp) => stampCatalog[stamp.detour_id]);
+  stampBenefits.hidden = benefitStamps.length === 0;
+  stampBenefitsList.innerHTML = benefitStamps.map((stamp) => {
+    const catalog = stampCatalog[stamp.detour_id];
+    const discount = Number(stamp.discount_percent) || 0;
+    const entries = Number(stamp.prize_entries) || 0;
+    return `
+      <article class="passport-benefit-row">
+        <img src="${catalog.image}" alt="" />
+        <div><strong>${escapeHtml(catalog.name)}</strong><span>${discount}% off first paid journey · ${entries} ${entries === 1 ? 'Field Kit draw entry' : 'Field Kit draw entries'}</span></div>
+        <code>${escapeHtml(stamp.stamp_code || 'FILED')}</code>
+      </article>`;
+  }).join('');
+}
+
 function showSignedOut() {
   currentUser = null;
   profile = signedOutProfile;
   passportStamps = [];
+  renderStampBenefits();
   signInForm.hidden = false;
   memberPanel.hidden = true;
   accountDescription.textContent = 'Use a private email link to open your passport on any device.';
@@ -326,7 +388,7 @@ function showSignedOut() {
 }
 
 async function loadPassportData(user) {
-  const [profileResult, stampsResult] = await Promise.all([
+  let [profileResult, stampsResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('display_name, home_base, passport_number, created_at')
@@ -334,10 +396,18 @@ async function loadPassportData(user) {
       .single(),
     supabase
       .from('stamps')
-      .select('detour_id, awarded_at')
+      .select('detour_id, awarded_at, stamp_code, discount_percent, prize_entries')
       .eq('user_id', user.id)
       .order('awarded_at', { ascending: true }),
   ]);
+
+  if (stampsResult.error && /stamp_code|discount_percent|prize_entries|schema cache/i.test(stampsResult.error.message)) {
+    stampsResult = await supabase
+      .from('stamps')
+      .select('detour_id, awarded_at')
+      .eq('user_id', user.id)
+      .order('awarded_at', { ascending: true });
+  }
 
   if (profileResult.error) {
     profile = {
@@ -347,6 +417,7 @@ async function loadPassportData(user) {
       passportNumber: 'SETUP REQUIRED',
     };
     passportStamps = [];
+    renderStampBenefits();
     setFeedback('Connected. Run the Elsewhere setup SQL in Supabase to activate profiles and stamps.', true);
     syncNote.textContent = 'Account connected — passport database setup is still required.';
     refreshVisibleSpread();
@@ -361,6 +432,7 @@ async function loadPassportData(user) {
     passportNumber: profileRow.passport_number,
   };
   passportStamps = stampsResult.error ? [] : (stampsResult.data ?? []);
+  renderStampBenefits();
   profileNameInput.value = profileRow.display_name ?? '';
   profileHomeBaseInput.value = profileRow.home_base ?? '';
   setFeedback(stampsResult.error ? 'Profile loaded, but stamps could not be retrieved.' : 'Passport synced.', Boolean(stampsResult.error));
@@ -384,6 +456,17 @@ async function syncAccount(session) {
   accountDescription.textContent = 'Your identity and earned stamps travel with this account.';
   setFeedback('Loading your passport…');
   await loadPassportData(user);
+
+  if (safeReturnTo && !isReturningToJourney) {
+    isReturningToJourney = true;
+    setFeedback('Passport verified. Returning to your journey…');
+    try {
+      window.localStorage.removeItem('elsewhere-return-to');
+    } catch {
+      // The validated in-memory return path is still safe to use.
+    }
+    window.setTimeout(() => window.location.replace(safeReturnTo), 450);
+  }
 }
 
 signInForm.addEventListener('submit', async (event) => {
@@ -394,8 +477,7 @@ signInForm.addEventListener('submit', async (event) => {
 
   submitButton.disabled = true;
   setFeedback('Sending your private sign-in link…');
-  const redirectUrl = new URL('.', window.location.href);
-  redirectUrl.search = '';
+  const redirectUrl = new URL('/passport/', window.location.origin);
   redirectUrl.hash = '';
 
   const { error } = await supabase.auth.signInWithOtp({

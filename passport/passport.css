@@ -159,6 +159,60 @@
   gap: 10px;
 }
 
+.passport-benefits {
+  margin-top: 17px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--passport-ink) 42%, transparent);
+}
+
+.passport-benefits > p {
+  margin: 0 0 9px;
+  color: var(--passport-ink);
+  font-size: 0.53rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.passport-benefit-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(48, 45, 103, 0.18);
+}
+
+.passport-benefit-row img {
+  display: block;
+  width: 52px;
+  transform: rotate(-5deg);
+}
+
+.passport-benefit-row strong,
+.passport-benefit-row span {
+  display: block;
+}
+
+.passport-benefit-row strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.passport-benefit-row span {
+  margin-top: 3px;
+  font-size: 0.55rem;
+  line-height: 1.35;
+}
+
+.passport-benefit-row code {
+  color: var(--passport-ink);
+  font-family: 'Courier New', monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
 .account-feedback {
   grid-column: 1 / -1;
   min-height: 1em;
@@ -737,6 +791,47 @@
   transform: translateX(-50%);
 }
 
+.stamp-space.is-earned.is-category-stamp {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--passport-ink);
+}
+
+.stamp-space.is-earned.is-category-stamp::before {
+  display: none;
+}
+
+.passport-stamp-image {
+  display: block;
+  width: min(96%, 138px);
+  max-height: 88%;
+  object-fit: contain;
+  opacity: 0.9;
+  filter: contrast(1.04);
+  mix-blend-mode: multiply;
+}
+
+.stamp-space.is-earned.is-category-stamp .passport-stamp-meta {
+  bottom: -1px;
+  width: 100%;
+  overflow: visible;
+  font-size: clamp(0.34rem, 0.48vw, 0.43rem);
+  letter-spacing: 0.045em;
+  line-height: 1.1;
+}
+
+.passport-stamp-meta b,
+.passport-stamp-meta small {
+  display: block;
+}
+
+.passport-stamp-meta small {
+  margin-top: 2px;
+  font-size: 0.9em;
+}
+
 .cover-title {
   top: 12%;
   width: 100%;
@@ -913,6 +1008,8 @@
   .passport-account { padding: 17px; box-shadow: 5px 6px 0 var(--passport-ink); }
   .account-input-row,
   .account-form--profile { grid-template-columns: 1fr; }
+  .passport-benefit-row { grid-template-columns: 48px minmax(0, 1fr); }
+  .passport-benefit-row code { grid-column: 2; }
   .account-form button { width: 100%; }
   .passport-stage-row {
     grid-template-columns: 1fr 1fr;
@@ -952,6 +1049,8 @@
   .stamp-grid { height: calc(100% - 18px); gap: 5px 7px; }
   .stamp-space { min-height: 43px; }
   .stamp-space.is-earned span { bottom: 6%; }
+  .stamp-space.is-earned.is-category-stamp .passport-stamp-meta { bottom: -2px; }
+  .passport-stamp-meta small { display: none; }
   .passport-arrow { width: 48px; height: 48px; font-size: 1.5rem; }
   .passport-privacy { padding: 0 18px; line-height: 1.4; }
 }
