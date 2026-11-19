@@ -11,6 +11,7 @@ export default defineConfig({
         library: 'library/index.html',
         libraryCategory: 'library/category/index.html',
         passport: 'passport/index.html',
+        about: 'about/index.html',
       },
     },
   },
